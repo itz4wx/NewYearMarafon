@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Новогодний Марафон</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Pacifico&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Background Elements (Snow, Trees) -->
+    <div class="bg-decorations">
+        <div class="snow-container" id="snowContainer"></div>
+        <img src="elka1.png" class="decor elka elka-left" alt="">
+        <img src="elka2.png" class="decor elka elka-right" alt="">
+    </div>
+
+    <!-- 1. Initial Loading Screen with Ded Moroz -->
+    <section id="screen-loading" class="screen active-screen">
+        <div class="content-center">
+            <h1 class="main-title">Новогодний<br>Марафон</h1>
+            <div class="ded-container">
+                <img src="dedprivet.png" alt="Дед Мороз" class="ded-img bounce-in">
+                <div class="speech-bubble fade-in-delay">
+                    <p>Хо-хо-хо! Приветствую тебя, друг!<br>Помоги мне собрать подарки для детей!</p>
+                </div>
+            </div>
+            <button class="btn-main pulse-btn" onclick="app.showMenu()">Начать приключение</button>
+        </div>
+    </section>
+
+    <!-- 2. Main Menu (Game List) -->
+    <section id="screen-menu" class="screen">
+        <header class="app-header">
+            <h2>Игры</h2>
+            <div class="balance-container">
+                <span id="user-balance">0</span>
+                <img src="vv.png" alt="Valuta" class="currency-icon">
+            </div>
+        </header>
+
+        <div class="games-grid">
+            <!-- Game 1: Starfall -->
+            <div class="game-card" id="card-starfall" onclick="app.tryStartGame('starfall')">
+                <div class="card-image">
+                    <img src="star.png" alt="Звездопад">
+                </div>
+                <div class="card-info">
+                    <h3>Звездопад</h3>
+                    <p>Собери звезды в носок!</p>
+                    <div class="card-status" id="timer-starfall">Играть</div>
+                </div>
+            </div>
+
+            <!-- Shop (Placeholder) -->
+            <div class="game-card locked">
+                <div class="card-image grayscale">
+                    <img src="vv.png" alt="Магазин">
+                </div>
+                <div class="card-info">
+                    <h3>Магазин</h3>
+                    <p>Скоро открытие...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Game Preloader -->
+    <section id="screen-game-loader" class="screen">
+        <div class="content-center">
+            <div class="spinner-holiday">
+                <img src="star.png" class="spin-star">
+            </div>
+            <h3>Готовим сани...</h3>
+            <p id="game-tip">Совет: Лови только звезды!</p>
+        </div>
+    </section>
+
+    <!-- 4. Game Screen: Starfall -->
+    <section id="screen-game" class="screen">
+        <div class="game-ui">
+            <div class="score-board">
+                <img src="star.png" alt="Stars">
+                <span id="game-score">0</span> / 50
+            </div>
+            <div class="timer-board">
+                ⏳ <span id="game-time">60</span>с
+            </div>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls-hint">Двигай пальцем или мышкой</div>
+    </section>
+
+    <!-- 5. Result Screen -->
+    <section id="screen-result" class="screen">
+        <div class="content-center">
+            <h2 id="result-title">Победа!</h2>
+            
+            <div class="ded-result-container">
+                <img id="result-ded-img" src="dedpobeda.png" alt="Result Ded" class="ded-img">
+            </div>
+
+            <div class="result-message-box">
+                <p id="result-message">Ты собрал все звезды! Держи награду.</p>
+                <div id="reward-box" class="reward-box">
+                    <span>+10</span> <img src="vv.png" class="currency-icon">
+                </div>
+            </div>
+
+            <button class="btn-main" onclick="app.showMenu()">В меню</button>
+        </div>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>
