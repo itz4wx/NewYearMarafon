@@ -23,10 +23,11 @@
             <div class="ded-container">
                 <img src="dedprivet.png" alt="Дед Мороз" class="ded-img bounce-in">
                 <div class="speech-bubble fade-in-delay">
-                    <p>Хо-хо-хо! Приветствую тебя, друг!<br>Помоги мне собрать подарки для детей!</p>
+                    <p>Этот Новый год не будет скучным! Я подготовил для вас интересные игры и крутые награды!</p>
                 </div>
             </div>
             <button id="btn-start-adventure" class="btn-main pulse-btn">Начать приключение</button>
+            <div class="footer-credits" style="margin-top: 20px; font-size: 0.8rem; opacity: 0.7;">Создано командой DexStars</div>
         </div>
     </section>
 
@@ -46,12 +47,13 @@
         <div class="games-grid">
             <!-- Game 1: Starfall -->
             <div class="game-card" id="card-starfall">
+                <div class="card-level-badge">Lvl <span id="menu-starfall-level">1</span></div>
                 <div class="card-image">
                     <img src="star.png" alt="Звездопад">
                 </div>
                 <div class="card-info">
                     <h3>Звездопад</h3>
-                    <p>Собери звезды в носок!</p>
+                    <p>Собери звезды в рождественский носок!</p>
                     <div class="card-actions">
                         <div class="card-status" id="timer-starfall">Играть</div>
                         <button id="btn-rules-starfall" class="btn-rules">?</button>
@@ -59,10 +61,40 @@
                 </div>
             </div>
 
+            <!-- Game 2: Roulette -->
+            <div class="game-card roulette-card" id="card-roulette">
+                <div class="card-image">
+                    <img src="cas.jpg" alt="Рулетка" onerror="this.src='star.png'">
+                </div>
+                <div class="card-info">
+                    <h3>Рулетка</h3>
+                    <p>Ежедневный бонус!</p>
+                    <div class="card-actions">
+                        <div class="card-status" id="timer-roulette">Крутить</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game 3: Guess the Cup -->
+            <div class="game-card" id="card-cups">
+                <div class="card-level-badge">Lvl <span id="menu-cups-level">1</span></div>
+                <div class="card-image">
+                    <img src="ygadai.png" alt="Угадай" onerror="this.src='sk1.png'">
+                </div>
+                <div class="card-info">
+                    <h3>Угадай Стаканчик</h3>
+                    <p>Где спрятан леденец?</p>
+                    <div class="card-actions">
+                        <div class="card-status" id="timer-cups">Играть</div>
+                        <button id="btn-rules-cups" class="btn-rules">?</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Shop (Placeholder) -->
             <div class="game-card locked">
                 <div class="card-image grayscale">
-                    <img src="valuta.png" alt="Магазин">
+                    <img src="ava2.png" alt="Магазин">
                 </div>
                 <div class="card-info">
                     <h3>Магазин</h3>
@@ -79,7 +111,7 @@
             <div id="rules-text" class="rules-body">
                 <!-- Text injected by JS -->
             </div>
-            <button id="btn-close-rules" class="btn-main small-btn">Понятно</button>
+            <button id="btn-close-rules" class="btn-nice small-btn">Понятно</button>
         </div>
     </div>
 
@@ -129,9 +161,97 @@
                 </div>
             </div>
 
-            <button id="btn-result-menu" class="btn-main">В меню</button>
+            <div class="result-actions" style="display: flex; gap: 10px; justify-content: center; width: 100%;">
+                <button id="btn-result-menu" class="btn-main">В меню</button>
+                <button id="btn-next-level" class="btn-main pulse-btn" style="display: none;">Следующий уровень</button>
+            </div>
         </div>
     </section>
+
+    <!-- 6. Roulette Screen -->
+    <section id="screen-roulette" class="screen">
+        <div class="content-center">
+            <h2 class="roulette-title">Ежедневная Рулетка</h2>
+            <p style="color: rgba(255,255,255,0.8); font-size: 0.9rem; margin-bottom: 20px; max-width: 300px; margin: 0 auto;">
+                Крути рулетку каждый день и пытай свою удачу! Выигрывай ценные призы, но берегись какашек!
+            </p>
+            <div class="roulette-container">
+                <div class="roulette-pointer"></div>
+                <div class="roulette-track" id="roulette-track">
+                    <!-- Items injected by JS -->
+                </div>
+            </div>
+            <button id="btn-spin" class="btn-main pulse-btn">КРУТИТЬ!</button>
+            <div id="roulette-timer-display" class="timer-display" style="display: none;"></div>
+            <button id="btn-roulette-back" class="btn-main small-btn" style="margin-top: 10px; background: rgba(255,255,255,0.2);">Назад</button>
+        </div>
+    </section>
+
+    <!-- 7. Cups Game Screens -->
+    <!-- Intro/Rules -->
+    <section id="screen-cups-intro" class="screen">
+        <div class="content-center">
+            <h2 class="main-title" style="font-size: 2.5rem;">Угадай Стаканчик</h2>
+            <div class="ded-container">
+                <img src="dedprivet.png" class="ded-img" style="width: 180px;">
+                <div class="speech-bubble fade-in-delay">
+                    <p>Я спрячу угощение под одним из стаканчиков. Следи внимательно, я буду их перемешивать! Угадай 3 раза и получи награду!</p>
+                </div>
+            </div>
+            <div class="rules-list" style="text-align: left; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 15px; margin: 15px 0; font-size: 0.9rem;">
+                <p>❄️ 12 Уровней сложности</p>
+                <p>❄️ 3 Раунда в каждой игре</p>
+                <p>❄️ Чем выше уровень, тем больше награда!</p>
+            </div>
+            <button id="btn-start-cups" class="btn-nice pulse-btn">Начать Игру</button>
+            <button id="btn-cups-back" class="btn-nice secondary small-btn" style="margin-top: 10px;">Назад</button>
+        </div>
+    </section>
+
+    <!-- Game Area -->
+    <section id="screen-cups-game" class="screen">
+        <div class="game-ui">
+             <div class="score-board">
+                <span>Раунд:</span> <span id="cups-round">1/3</span>
+            </div>
+            <div class="timer-board">
+                ⏳ <span id="cups-time">10</span>с
+            </div>
+            <div class="level-board">
+                Lvl <span id="cups-level-display">1</span>
+            </div>
+        </div>
+        
+        <div class="content-center" style="justify-content: flex-start; padding-top: 50px;">
+            <div id="cups-area" class="cups-area">
+                <!-- Injected by JS -->
+            </div>
+            <div id="cups-message" class="controls-hint" style="margin-top: 30px;">Следи за предметом!</div>
+        </div>
+    </section>
+
+    <!-- 7. Roulette Reward Modal -->
+    <div id="modal-roulette-reward" class="modal-overlay">
+        <div class="modal-content">
+            <h3>Поздравляем!</h3>
+            <div id="roulette-reward-display" class="reward-display">
+                <!-- Icon and Text -->
+            </div>
+            <div class="roulette-actions">
+                <button id="btn-claim-reward" class="btn-main small-btn">Забрать</button>
+                <button id="btn-sell-reward" class="btn-main small-btn" style="background: #4a5568;">Продать (+<span id="sell-price">0</span>)</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 8. Cups Round Result Overlay -->
+    <div id="cups-round-result" class="modal-overlay" style="z-index: 150;">
+        <div class="modal-content" style="background: rgba(15, 22, 38, 0.95); border: 2px solid #ffd700;">
+            <h3 id="cups-round-title" style="margin-bottom: 15px; color: #ffd700;"></h3>
+            <img id="cups-round-img" src="dedprivet.png" style="width: 120px; height: auto; animation: dedBreath 2s infinite;">
+            <p id="cups-round-msg" style="margin-top: 15px; font-weight: bold; font-size: 1.1rem;"></p>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
