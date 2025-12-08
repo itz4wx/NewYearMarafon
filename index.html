@@ -26,37 +26,43 @@
                     <p>Хо-хо-хо! Приветствую тебя, друг!<br>Помоги мне собрать подарки для детей!</p>
                 </div>
             </div>
-            <button class="btn-main pulse-btn" onclick="app.showMenu()">Начать приключение</button>
+            <button id="btn-start-adventure" class="btn-main pulse-btn">Начать приключение</button>
         </div>
     </section>
 
     <!-- 2. Main Menu (Game List) -->
     <section id="screen-menu" class="screen">
         <header class="app-header">
-            <h2>Игры</h2>
+            <div class="header-titles">
+                <h1 class="menu-title-small">Новогодний Марафон</h1>
+                <h2>Мини-Игры</h2>
+            </div>
             <div class="balance-container">
                 <span id="user-balance">0</span>
-                <img src="vv.png" alt="Valuta" class="currency-icon">
+                <img src="zima.png" alt="Valuta" class="currency-icon">
             </div>
         </header>
 
         <div class="games-grid">
             <!-- Game 1: Starfall -->
-            <div class="game-card" id="card-starfall" onclick="app.tryStartGame('starfall')">
+            <div class="game-card" id="card-starfall">
                 <div class="card-image">
                     <img src="star.png" alt="Звездопад">
                 </div>
                 <div class="card-info">
                     <h3>Звездопад</h3>
                     <p>Собери звезды в носок!</p>
-                    <div class="card-status" id="timer-starfall">Играть</div>
+                    <div class="card-actions">
+                        <div class="card-status" id="timer-starfall">Играть</div>
+                        <button id="btn-rules-starfall" class="btn-rules">?</button>
+                    </div>
                 </div>
             </div>
 
             <!-- Shop (Placeholder) -->
             <div class="game-card locked">
                 <div class="card-image grayscale">
-                    <img src="vv.png" alt="Магазин">
+                    <img src="valuta.png" alt="Магазин">
                 </div>
                 <div class="card-info">
                     <h3>Магазин</h3>
@@ -65,6 +71,17 @@
             </div>
         </div>
     </section>
+
+    <!-- Rules Modal -->
+    <div id="modal-rules" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="rules-title">Правила игры</h3>
+            <div id="rules-text" class="rules-body">
+                <!-- Text injected by JS -->
+            </div>
+            <button id="btn-close-rules" class="btn-main small-btn">Понятно</button>
+        </div>
+    </div>
 
     <!-- 3. Game Preloader -->
     <section id="screen-game-loader" class="screen">
@@ -79,10 +96,14 @@
 
     <!-- 4. Game Screen: Starfall -->
     <section id="screen-game" class="screen">
+        <div id="game-countdown" class="game-countdown"></div>
         <div class="game-ui">
             <div class="score-board">
                 <img src="star.png" alt="Stars">
-                <span id="game-score">0</span> / 50
+                <span id="game-score">0</span> / <span id="game-target">50</span>
+            </div>
+            <div class="level-board">
+                Lvl <span id="game-level">1</span>
             </div>
             <div class="timer-board">
                 ⏳ <span id="game-time">60</span>с
@@ -104,11 +125,11 @@
             <div class="result-message-box">
                 <p id="result-message">Ты собрал все звезды! Держи награду.</p>
                 <div id="reward-box" class="reward-box">
-                    <span>+10</span> <img src="vv.png" class="currency-icon">
+                    <span>+10</span> <img src="zima.png" class="currency-icon">
                 </div>
             </div>
 
-            <button class="btn-main" onclick="app.showMenu()">В меню</button>
+            <button id="btn-result-menu" class="btn-main">В меню</button>
         </div>
     </section>
 
