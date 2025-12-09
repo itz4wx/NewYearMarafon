@@ -68,11 +68,11 @@
                 { id: 'spin', name: 'Доп. Прокрут', type: 'extra_spin', val: 1, weight: 100, img: 'perekrut.png', sell: 50 },
                 { id: 'kaka', name: 'Какашка', type: 'junk', val: 0, weight: 300, img: 'kaka.png', sell: 0 },
                 { id: 'boost', name: 'Супер-Усиление', type: 'buff', val: 1, weight: 50, img: 'star.png', sell: 200 },
-                { id: 'cookie1', name: '1 Пряная Печенька', type: 'item', val: 1, weight: 80, img: 'valuta.png', sell: 0 }, // Cookies not sellable
+                { id: 'cookie1', name: '1 Снежинка', type: 'currency', val: 1, weight: 80, img: 'zima.png', sell: 0 }, // Changed from Cookie
                 { id: 'tg25', name: '25 TG Stars', type: 'special', val: 25, weight: 5, img: 'star.png', sell: 1000 },
-                { id: 'cup_hint', name: 'Подсказка в стаканчиках', type: 'buff_cup_hint', val: 1, weight: 1, img: 'sk1.png', sell: 300 }, // Extremely rare
+                { id: 'cup_hint', name: 'Подсказка в стаканчиках', type: 'buff_cup_hint', val: 1, weight: 1, img: 'pods.png', sell: 300 },
                 // Random fillers
-                { id: 'snow_rnd', name: 'Случайные Снежинки', type: 'currency', val: 0, weight: 20, img: 'vv.png', sell: 0 }
+                { id: 'snow_rnd', name: 'Случайные Снежинки', type: 'currency', val: 0, weight: 20, img: 'zima.png', sell: 0 }
             ]
         },
         cups: {
@@ -856,21 +856,15 @@
                 if (STATE.games.cups.level < 12) STATE.games.cups.level++;
                 else STATE.games.cups.level = 1;
 
-                // Win = No Cooldown (Player can proceed)
-                // We do NOT update lastPlayed to current time, so the diff remains large enough (played long ago)
-                // But wait, if we don't update lastPlayed, the "Play" button in menu might show "Ready".
-                // But the user wants "Next Level" button in result screen.
-
-                // To allow "Next Level" immediately:
-                // We set lastPlayed to 0 (or a long time ago).
-                STATE.games.cups.lastPlayed = 0;
+                // Win = Cooldown too (Requested by user)
+                STATE.games.cups.lastPlayed = Date.now();
 
                 // Reset Hint
                 STATE.games.cups.hintActive = false;
             } else {
                 // Lose = Cooldown
                 STATE.games.cups.lastPlayed = Date.now();
-                STATE.games.cups.hintActive = false; // Lose hint if lost? Or keep? Usually consumables are used.
+                STATE.games.cups.hintActive = false;
             }
 
             app.saveState();
@@ -905,7 +899,10 @@
             document.getElementById('btn-sell-reward').addEventListener('click', app.sellReward);
 
             // Result Screen Next Level
-            document.getElementById('btn-next-level').addEventListener('click', () => {
+            document.getElementById('btn-next-level').addEventListener('click', (e) => {
+                const btn = e.target; // or use currentTarget
+                if (btn.dataset.locked === "true") return; // Block click if locked
+
                 // Determine which game we are in?
                 // Currently only Cups uses this logic based on request
                 app.switchScreen('screen-game-loader');
@@ -980,6 +977,10 @@
         },
 
         showMenu: () => {
+            if (app.resultInterval) {
+                clearInterval(app.resultInterval);
+                app.resultInterval = null;
+            }
             app.updateUI();
             app.switchScreen('screen-menu');
         },
@@ -1243,10 +1244,42 @@
             // maybe rename it to "Следующий уровень" (it is already named that in HTML).
             // I will assume standard "Next Level" button is fine if it works.
 
+            // Handle Next Level Button with Timer
             if (correctGuesses >= 1) {
                 const btn = document.getElementById('btn-next-level');
                 btn.style.display = 'inline-block';
-                btn.innerText = "Следующий Уровень >>>";
+                btn.classList.add('cooldown');
+
+                // Calculate wait time
+                let cooldown = CONFIG.cups.baseCooldown;
+                if (STATE.games.cups.level >= 3) cooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
+
+                const updateBtn = () => {
+                    const diff = Date.now() - STATE.games.cups.lastPlayed;
+                    const rem = cooldown - diff;
+
+                    if (rem <= 0) {
+                        btn.innerText = "Следующий Уровень >>>";
+                        btn.classList.remove('cooldown');
+                        btn.dataset.locked = "false";
+                        if (app.resultInterval) clearInterval(app.resultInterval);
+                    } else {
+                        const m = Math.floor(rem / 60000);
+                        const s = Math.floor((rem % 60000) / 1000);
+                        btn.innerText = `До след. уровня: ${m}:${s < 10 ? '0' : ''}${s}`;
+                        btn.dataset.locked = "true";
+                    }
+                };
+
+                btn.dataset.locked = "true";
+                updateBtn();
+
+                if (app.resultInterval) clearInterval(app.resultInterval);
+                app.resultInterval = setInterval(updateBtn, 1000);
+
+                // Override click behavior for this button? 
+                // The existing listener handles switchScreen.
+                // We need to prevent it if locked.
             }
 
             app.switchScreen('screen-result');

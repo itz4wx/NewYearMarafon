@@ -133,16 +133,20 @@
     <!-- 4. Game Screen: Starfall -->
     <section id="screen-game" class="screen">
         <div id="game-countdown" class="game-countdown"></div>
-        <div class="game-ui">
-            <div class="score-board">
-                <img src="star.png" alt="Stars">
-                <span id="game-score">0</span> / <span id="game-target">50</span>
+        <div class="glass-header">
+            <div class="gh-item">
+                <!-- Score & Target -->
+                <span>Звезды</span>
+                <div class="gh-value">
+                    <span id="game-score">0</span> / <span id="game-target">50</span>
+                </div>
             </div>
-            <div class="level-board">
-                Lvl <span id="game-level">1</span>
+            <div class="gh-item">
+                <span id="game-time" class="gh-timer">60</span>
             </div>
-            <div class="timer-board">
-                ⏳ <span id="game-time">60</span>с
+            <div class="gh-item">
+                <span>Lvl</span>
+                <span id="game-level" class="gh-value">1</span>
             </div>
         </div>
         <canvas id="gameCanvas"></canvas>

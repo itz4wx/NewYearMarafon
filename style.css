@@ -744,6 +744,8 @@ body::before {
     color: rgba(255, 255, 255, 0.7);
     font-size: 0.8rem;
     font-weight: 600;
+    flex: 1;
+    /* Ensure equal width distribution for safe centering */
 }
 
 .gh-value {
