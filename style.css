@@ -1,7 +1,10 @@
 :root {
-    --primary-color: #ff3d3d; /* Holiday Red */
-    --secondary-color: #0f1626; /* Deep Night */
-    --accent-color: #ffd700; /* Gold */
+    --primary-color: #ff3d3d;
+    /* Holiday Red */
+    --secondary-color: #0f1626;
+    /* Deep Night */
+    --accent-color: #ffd700;
+    /* Gold */
     --text-color: #ffffff;
     --glass-bg: rgba(255, 255, 255, 0.1);
     --glass-border: rgba(255, 255, 255, 0.2);
@@ -37,10 +40,10 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background: 
-        radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
-        radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
-        radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+    background:
+        radial-gradient(white, rgba(255, 255, 255, .2) 2px, transparent 3px),
+        radial-gradient(white, rgba(255, 255, 255, .15) 1px, transparent 2px),
+        radial-gradient(white, rgba(255, 255, 255, .1) 2px, transparent 3px);
     background-size: 550px 550px, 350px 350px, 250px 250px;
     background-position: 0 0, 40px 60px, 130px 270px;
     animation: starsMove 120s linear infinite;
@@ -49,8 +52,13 @@ body::before {
 }
 
 @keyframes starsMove {
-    from { transform: translateY(0); }
-    to { transform: translateY(-550px); }
+    from {
+        transform: translateY(0);
+    }
+
+    to {
+        transform: translateY(-550px);
+    }
 }
 
 /* --- Snow Animation --- */
@@ -75,7 +83,9 @@ body::before {
 }
 
 @keyframes fall {
-    to { transform: translateY(105vh) rotate(360deg); }
+    to {
+        transform: translateY(105vh) rotate(360deg);
+    }
 }
 
 /* --- Background Decorations --- */
@@ -95,24 +105,41 @@ body::before {
     width: 35vw;
     max-width: 180px;
     opacity: 0.9;
-    filter: drop-shadow(0 0 15px rgba(0,0,0,0.7));
+    filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.7));
     transition: transform 3s ease-in-out;
 }
 
-.elka-left { 
-    left: -20px; 
-    transform: rotate(2deg); 
+.elka-left {
+    left: -20px;
+    transform: rotate(2deg);
     animation: sway 5s infinite alternate ease-in-out;
 }
 
-.elka-right { 
-    right: -20px; 
-    transform: scaleX(-1) rotate(2deg); 
+.elka-right {
+    right: -20px;
+    transform: scaleX(-1) rotate(2deg);
     animation: sway-reverse 6s infinite alternate ease-in-out;
 }
 
-@keyframes sway { from { transform: rotate(0deg); } to { transform: rotate(4deg); } }
-@keyframes sway-reverse { from { transform: scaleX(-1) rotate(0deg); } to { transform: scaleX(-1) rotate(4deg); } }
+@keyframes sway {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(4deg);
+    }
+}
+
+@keyframes sway-reverse {
+    from {
+        transform: scaleX(-1) rotate(0deg);
+    }
+
+    to {
+        transform: scaleX(-1) rotate(4deg);
+    }
+}
 
 /* --- Screens --- */
 .screen {
@@ -159,7 +186,7 @@ body::before {
     border-radius: 50px;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 10px 25px rgba(221, 36, 118, 0.5), inset 0 2px 5px rgba(255,255,255,0.3);
+    box-shadow: 0 10px 25px rgba(221, 36, 118, 0.5), inset 0 2px 5px rgba(255, 255, 255, 0.3);
     transition: all 0.2s;
     font-family: var(--font-main);
     text-transform: uppercase;
@@ -170,13 +197,15 @@ body::before {
 }
 
 .timer-display {
-    background: #4a5568; /* Disabled button color */
-    color: #ffd700; /* Gold text for timer */
+    background: #4a5568;
+    /* Disabled button color */
+    color: #ffd700;
+    /* Gold text for timer */
     padding: 18px 45px;
     font-size: 1.3rem;
     border-radius: 50px;
     font-weight: 800;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,0.3);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
     font-family: var(--font-main);
     text-transform: uppercase;
     letter-spacing: 1.5px;
@@ -192,7 +221,7 @@ body::before {
     left: -50%;
     width: 200%;
     height: 200%;
-    background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
     transform: rotate(45deg);
     animation: shine 3s infinite;
 }
@@ -246,8 +275,14 @@ body::before {
 }
 
 @keyframes shine {
-    0% { transform: translateX(-100%) rotate(45deg); }
-    20%, 100% { transform: translateX(100%) rotate(45deg); }
+    0% {
+        transform: translateX(-100%) rotate(45deg);
+    }
+
+    20%,
+    100% {
+        transform: translateX(100%) rotate(45deg);
+    }
 }
 
 .btn-main:active {
@@ -260,7 +295,7 @@ body::before {
     font-family: var(--font-title);
     font-size: 3.5rem;
     color: var(--accent-color);
-    text-shadow: 
+    text-shadow:
         2px 2px 0px #d35400,
         0 0 20px rgba(255, 215, 0, 0.8),
         0 0 40px rgba(255, 61, 61, 0.4);
@@ -271,8 +306,13 @@ body::before {
 }
 
 @keyframes titleFloat {
-    from { transform: rotate(-3deg) translateY(0); }
-    to { transform: rotate(-3deg) translateY(-10px); }
+    from {
+        transform: rotate(-3deg) translateY(0);
+    }
+
+    to {
+        transform: rotate(-3deg) translateY(-10px);
+    }
 }
 
 .ded-container {
@@ -283,13 +323,20 @@ body::before {
 .ded-img {
     width: 220px;
     height: auto;
-    filter: drop-shadow(0 10px 25px rgba(0,0,0,0.4));
+    filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.4));
     animation: dedBreath 4s ease-in-out infinite;
 }
 
 @keyframes dedBreath {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.02); }
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
 }
 
 .speech-bubble {
@@ -298,13 +345,15 @@ body::before {
     padding: 18px;
     border-radius: 20px;
     position: absolute;
-    top: -60px; /* Moved higher */
-    left: 50%; 
-    margin-left: 50px; /* Offset to side */
+    top: -60px;
+    /* Moved higher */
+    left: 50%;
+    margin-left: 50px;
+    /* Offset to side */
     width: 180px;
     font-size: 0.95rem;
     font-weight: 700;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
     animation: bubblePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards 1s;
     opacity: 0;
     transform: scale(0);
@@ -325,7 +374,10 @@ body::before {
 }
 
 @keyframes bubblePop {
-    to { opacity: 1; transform: scale(1); }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 /* --- Menu Screen --- */
@@ -356,7 +408,7 @@ body::before {
     gap: 12px;
     border: 1px solid rgba(255, 215, 0, 0.3);
     backdrop-filter: blur(5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
 .currency-icon {
@@ -383,19 +435,25 @@ body::before {
 }
 
 /* Scrollbar hide */
-.games-grid::-webkit-scrollbar { display: none; }
-.games-grid { -ms-overflow-style: none; scrollbar-width: none; }
+.games-grid::-webkit-scrollbar {
+    display: none;
+}
+
+.games-grid {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
 
 .game-card {
-    background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
     border-radius: 25px;
     overflow: hidden;
     display: flex;
     align-items: center;
     padding: 40px 25px;
     backdrop-filter: blur(15px);
-    border: 1px solid rgba(255,255,255,0.15);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     position: relative;
 }
@@ -407,7 +465,7 @@ body::before {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent);
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
     transform: skewX(-20deg) translateX(-150%);
     transition: 0.5s;
 }
@@ -419,15 +477,17 @@ body::before {
 .card-image {
     width: 90px;
     height: 90px;
-    background: rgba(0,0,0,0.3);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
     margin-right: 20px;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
-    position: relative; /* Added for badge positioning */
-    overflow: hidden; /* Fix for image clipping */
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+    position: relative;
+    /* Added for badge positioning */
+    overflow: hidden;
+    /* Fix for image clipping */
 }
 
 .card-level-badge {
@@ -440,10 +500,10 @@ body::before {
     font-weight: 800;
     padding: 4px 10px;
     border-radius: 15px;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
     z-index: 5;
-    border: 1px solid rgba(255,255,255,0.4);
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .card-image img {
@@ -458,8 +518,8 @@ body::before {
 .roulette-card .card-image img {
     width: 100%;
     height: 100%;
-    object-fit: cover; 
-    filter: none; 
+    object-fit: cover;
+    filter: none;
 }
 
 .roulette-card {
@@ -502,7 +562,10 @@ body::before {
 .card-status {
     display: inline-block;
     background: var(--primary-color);
-    padding: 8px 18px;
+    padding: 10px 10px;
+    /* Reduced padding on mobile */
+    min-width: 80px;
+    text-align: center;
     border-radius: 12px;
     font-size: 0.9rem;
     font-weight: bold;
@@ -527,8 +590,8 @@ body::before {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.15);
-    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
     font-weight: bold;
     font-size: 1.1rem;
@@ -540,7 +603,7 @@ body::before {
 }
 
 .btn-rules:hover {
-    background: rgba(255,255,255,0.3);
+    background: rgba(255, 255, 255, 0.3);
 }
 
 /* --- Game Preloader --- */
@@ -560,9 +623,17 @@ body::before {
 }
 
 @keyframes spinStar {
-    0% { transform: rotate(0deg) scale(0.8); }
-    50% { transform: rotate(180deg) scale(1.1); }
-    100% { transform: rotate(360deg) scale(0.8); }
+    0% {
+        transform: rotate(0deg) scale(0.8);
+    }
+
+    50% {
+        transform: rotate(180deg) scale(1.1);
+    }
+
+    100% {
+        transform: rotate(360deg) scale(0.8);
+    }
 }
 
 /* --- Game Screen --- */
@@ -577,8 +648,10 @@ body::before {
     gap: 10px;
 }
 
-.score-board, .timer-board, .level-board {
-    background: rgba(0,0,0,0.6);
+.score-board,
+.timer-board,
+.level-board {
+    background: rgba(0, 0, 0, 0.6);
     padding: 10px 15px;
     border-radius: 30px;
     font-weight: bold;
@@ -586,7 +659,7 @@ body::before {
     display: flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(5px);
     white-space: nowrap;
 }
@@ -600,7 +673,7 @@ body::before {
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
     margin: 10px auto;
-    box-shadow: 
+    box-shadow:
         0 0 30px rgba(0, 0, 0, 0.3),
         inset 0 0 50px rgba(255, 255, 255, 0.05);
     display: block;
@@ -613,15 +686,22 @@ body::before {
 
 .controls-hint {
     font-size: 1rem;
-    color: rgba(255,255,255,0.8);
+    color: rgba(255, 255, 255, 0.8);
     margin-top: 15px;
     animation: hintPulse 2s infinite;
     text-align: center;
 }
 
 @keyframes hintPulse {
-    0%, 100% { opacity: 0.5; }
-    50% { opacity: 1; }
+
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+
+    50% {
+        opacity: 1;
+    }
 }
 
 /* --- Result Screen --- */
@@ -632,7 +712,7 @@ body::before {
     margin: 25px 0;
     border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(20px);
-    box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
 }
 
 .reward-box {
@@ -652,9 +732,20 @@ body::before {
 }
 
 @keyframes rewardPulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
-    70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
-    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4);
+    }
+
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    }
 }
 
 /* --- Modal --- */
@@ -687,7 +778,7 @@ body::before {
     width: 90%;
     max-width: 400px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
     text-align: center;
     transform: scale(0.9);
     transition: transform 0.3s ease;
@@ -715,23 +806,67 @@ body::before {
 
 /* --- Mobile Optimization --- */
 @media (max-width: 480px) {
-    .main-title { font-size: 2.5rem; }
-    .ded-img { width: 180px; }
-    .speech-bubble { 
-        width: 150px; 
-        font-size: 0.85rem; 
-        top: -85px; /* Higher on mobile */
-        margin-left: 10px; /* Closer to center to stay on screen */
+    .main-title {
+        font-size: 2.5rem;
     }
+
+    .ded-img {
+        width: 180px;
+    }
+
+    .speech-bubble {
+        width: 150px;
+        font-size: 0.85rem;
+        top: -85px;
+        /* Higher on mobile */
+        margin-left: 10px;
+        /* Closer to center to stay on screen */
+    }
+
     .speech-bubble::after {
-         bottom: 10px;
-         transform: rotate(20deg);
+        bottom: 10px;
+        transform: rotate(20deg);
     }
-    .btn-main { padding: 15px 35px; font-size: 1.1rem; }
-    .game-card { padding: 15px; }
-    .card-image { width: 70px; height: 70px; margin-right: 15px; }
-    .card-image img { width: 50px; height: 50px; }
-    .score-board, .timer-board, .level-board { padding: 8px 12px; font-size: 0.9rem; }
+
+    .btn-main {
+        padding: 15px 25px;
+        font-size: 1rem;
+        width: 100%;
+        max-width: 300px;
+    }
+
+    /* Fixed width buttons */
+    .game-card {
+        padding: 15px;
+    }
+
+    .card-image {
+        width: 70px;
+        height: 70px;
+        margin-right: 15px;
+    }
+
+    .card-image img {
+        width: 50px;
+        height: 50px;
+    }
+
+    .score-board,
+    .timer-board,
+    .level-board {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+
+    .card-actions {
+        flex-wrap: wrap;
+    }
+
+    .card-status {
+        width: 100%;
+        text-align: center;
+        margin-bottom: 5px;
+    }
 }
 
 /* --- New Styles --- */
@@ -770,9 +905,20 @@ body::before {
 }
 
 @keyframes countdownPop {
-    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+
+    50% {
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
 }
 
 /* --- Roulette Screen (Redesign) --- */
@@ -792,14 +938,15 @@ body::before {
 .roulette-container {
     width: 100%;
     max-width: 500px;
-    height: 130px; /* Reduced height */
+    height: 130px;
+    /* Reduced height */
     background: rgba(20, 20, 20, 0.9);
     border-radius: 20px;
     border: 2px solid #ffd700;
     margin: 20px auto;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 0 30px rgba(0,0,0,0.5);
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
 }
@@ -812,73 +959,53 @@ body::before {
 }
 
 .roulette-item {
-    min-width: 100px; /* Reduced width */
-    height: 100px; /* Reduced height */
+    min-width: 100px;
+    /* Reduced width */
+    height: 100px;
+    /* Reduced height */
     margin: 0 5px;
     background: linear-gradient(145deg, #2d2d2d, #1a1a1a);
     border-radius: 15px;
-    border: 1px solid rgba(255,255,255,0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    box-shadow: 5px 5px 10px rgba(0,0,0,0.5), -5px -5px 10px rgba(255,255,255,0.02);
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5), -5px -5px 10px rgba(255, 255, 255, 0.02);
     position: relative;
 }
 
 .roulette-item img {
-    width: 50px; /* Reduced image */
+    width: 50px;
+    /* Reduced image */
     height: 50px;
     object-fit: contain;
     margin-bottom: 5px;
-    filter: drop-shadow(0 0 5px rgba(255,255,255,0.2));
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.2));
 }
 
 .roulette-item span {
-    font-size: 0.75rem; /* Reduced font */
+    font-size: 0.75rem;
+    /* Reduced font */
     text-align: center;
     line-height: 1.1;
     padding: 0 5px;
-    color: rgba(255,255,255,0.9);
+    color: rgba(255, 255, 255, 0.9);
     font-weight: 600;
 }
 
 /* Restored Beautiful Borders */
 .roulette-item.rare {
-    border: 2px solid rgba(255, 215, 0, 0.5); /* Semi-transparent gold */
-    background: linear-gradient(145deg, #3d3d20, #1a1a1a);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    /* Semi-transparent gold */
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
 }
 
 .roulette-item.super-rare {
     position: relative;
-    background: linear-gradient(145deg, #2d2d00, #1a1a1a);
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.4), inset 0 0 15px rgba(255, 215, 0, 0.2);
-    border: none; /* Removed standard border to use pseudo-element gradient */
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+    border: 2px solid #ffd700;
     z-index: 1;
-}
-
-.roulette-item.super-rare::before {
-    content: '';
-    position: absolute;
-    inset: -2px; /* Border width */
-    border-radius: 17px; /* item radius + border width */
-    padding: 2px;
-    background: linear-gradient(45deg, #ffd700, #ffaa00, #ffd700);
-    -webkit-mask: 
-       linear-gradient(#fff 0 0) content-box, 
-       linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    z-index: -1;
-    pointer-events: none;
-    animation: borderShimmer 2s linear infinite;
-}
-
-@keyframes borderShimmer {
-    0% { filter: hue-rotate(0deg) brightness(1); }
-    50% { filter: hue-rotate(10deg) brightness(1.2); }
-    100% { filter: hue-rotate(0deg) brightness(1); }
 }
 
 .roulette-pointer {
@@ -888,11 +1015,12 @@ body::before {
     transform: translateX(-50%);
     width: 0;
     height: 0;
-    border-left: 15px solid transparent; /* Smaller pointer */
+    border-left: 15px solid transparent;
+    /* Smaller pointer */
     border-right: 15px solid transparent;
     border-top: 25px solid #ff3d3d;
     z-index: 10;
-    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
 }
 
 /* Timer Display Style - Optimized */
@@ -900,21 +1028,25 @@ body::before {
     background: #1a0505;
     color: #ffd700;
     border: 2px solid #ffd700;
-    padding: 10px 25px; /* Reduced padding */
+    padding: 10px 25px;
+    /* Reduced padding */
     border-radius: 40px;
-    font-size: 1.1rem; /* Reduced font */
+    font-size: 1.1rem;
+    /* Reduced font */
     font-weight: 800;
     font-family: var(--font-main);
     margin-top: 15px;
     box-shadow: 0 0 15px rgba(255, 215, 0, 0.15);
     display: inline-block;
-    min-width: 250px; /* Reduced min-width */
+    min-width: 250px;
+    /* Reduced min-width */
     text-transform: uppercase;
 }
 
 /* Buttons Override for Roulette */
 #btn-spin {
-    font-size: 1.1rem; /* Reduced font */
+    font-size: 1.1rem;
+    /* Reduced font */
     padding: 14px 40px;
     margin-top: 20px;
     box-shadow: 0 8px 25px rgba(255, 61, 61, 0.3);
@@ -922,8 +1054,8 @@ body::before {
 
 #btn-roulette-back {
     background: transparent;
-    border: 2px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.6);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
     margin-top: 20px;
     padding: 10px 30px;
     font-size: 0.9rem;
@@ -935,27 +1067,54 @@ body::before {
 }
 
 #btn-roulette-back:hover {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255, 255, 255, 0.1);
     color: white;
-    border-color: rgba(255,255,255,0.3);
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* Mobile Adjustments for Roulette */
 @media (max-width: 480px) {
-    .roulette-title { font-size: 2rem; }
-    .roulette-container { height: 110px; max-width: 90%; }
-    .roulette-item { min-width: 90px; height: 90px; }
-    .roulette-item img { width: 40px; height: 40px; }
-    .roulette-item span { font-size: 0.7rem; }
-    .timer-display { font-size: 0.9rem; padding: 10px 15px; min-width: 200px; }
-    #btn-spin { padding: 12px 30px; font-size: 1rem; }
+    .roulette-title {
+        font-size: 2rem;
+    }
+
+    .roulette-container {
+        height: 110px;
+        max-width: 90%;
+    }
+
+    .roulette-item {
+        min-width: 90px;
+        height: 90px;
+    }
+
+    .roulette-item img {
+        width: 40px;
+        height: 40px;
+    }
+
+    .roulette-item span {
+        font-size: 0.7rem;
+    }
+
+    .timer-display {
+        font-size: 0.9rem;
+        padding: 10px 15px;
+        min-width: 200px;
+    }
+
+    #btn-spin {
+        padding: 12px 30px;
+        font-size: 1rem;
+    }
 }
 
 /* --- Cups Game Styles (Fix) --- */
 .cups-area {
     position: relative;
     width: 100%;
-    height: 150px;
+    height: 180px;
+    /* Increased height to avoid text overlap */
     margin-top: 50px;
     margin-bottom: 20px;
 }
@@ -963,8 +1122,10 @@ body::before {
 .cup-wrapper {
     position: absolute;
     bottom: 0;
-    width: 25%;
-    max-width: 100px;
+    width: 30%;
+    /* Slightly wider relative to container */
+    max-width: 130px;
+    /* Increased size */
     height: auto;
     aspect-ratio: 1;
     cursor: pointer;
@@ -980,21 +1141,44 @@ body::before {
     position: relative;
     z-index: 10;
     transition: transform 0.3s;
-    filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+    filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.5));
+    transform: scaleY(-1);
+    /* Flip vertically */
+    transform-origin: center center;
+    /* Fix alignment - rotate around center */
 }
 
 .cup-item {
     position: absolute;
-    bottom: 10px;
     left: 50%;
     transform: translateX(-50%);
-    width: 60%;
-    height: auto;
+    width: 40%;
+    /* Smaller to hide better */
+    bottom: 20px;
+    /* Sit inside the cup */
+    z-index: 1;
+}
+
+/* Fix stacking: Cup image needs to cover item. */
+.cup-wrapper {
+    /* ... existing ... */
+    z-index: 10;
+}
+
+.cup-img {
+    z-index: 20;
+}
+
+.cup-item {
     z-index: 5;
 }
 
 .cup-wrapper.lift .cup-img {
-    transform: translateY(-90px);
+    transform: scaleY(-1) translateY(90px);
+    /* Move UP (which is +Y because of flip? No, translate applies before?) 
+                                               Actually if scaleY(-1), Y axis is inverted. So +90 go DOWN visually? 
+                                               Wait. scaleY(-1) flips around origin. 
+                                               Let's try translateY(90px) relative to flipped axis. */
 }
 
 .reveal-overlay {
@@ -1008,7 +1192,7 @@ body::before {
     display: flex;
     justify-content: center;
     align-items: center;
-    background: rgba(0,0,0,0.7);
+    background: rgba(0, 0, 0, 0.7);
     opacity: 0;
     transition: opacity 0.3s;
 }
@@ -1026,8 +1210,13 @@ body::before {
 }
 
 @keyframes revealPop {
-    from { transform: scale(0); }
-    to { transform: scale(1); }
+    from {
+        transform: scale(0);
+    }
+
+    to {
+        transform: scale(1);
+    }
 }
 
 .cup-wrapper.correct .cup-img {
@@ -1036,4 +1225,24 @@ body::before {
 
 .cup-wrapper.wrong .cup-img {
     filter: drop-shadow(0 0 20px #ff0000);
+}
+
+.reward-main-img {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 25px rgba(255, 215, 0, 0.6));
+    animation: simpleFloat 4s ease-in-out infinite;
+}
+
+@keyframes simpleFloat {
+
+    0%,
+    100% {
+        transform: translateY(0) scale(1);
+    }
+
+    50% {
+        transform: translateY(-10px) scale(1.05);
+    }
 }
