@@ -225,7 +225,14 @@ body::before {
     gap: 5px;
     border: 2px solid rgba(255, 215, 0, 0.3);
     line-height: 1.2;
-    min-width: 280px;
+    min-width: 200px;
+    /* Reduced min-width */
+    width: 60%;
+    /* standardized width */
+    background: rgba(46, 50, 60, 0.9);
+    /* Darker button-like bg */
+    border: 1px solid rgba(255, 215, 0, 0.5);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .btn-main::after {
@@ -242,10 +249,17 @@ body::before {
 
 .btn-main.small-btn {
     padding: 14px 30px;
-    /* Increased from 10px 25px */
     font-size: 1.1rem;
     margin-top: 15px;
     box-shadow: 0 5px 15px rgba(221, 36, 118, 0.3);
+}
+
+.btn-main.tiny-btn {
+    padding: 8px 20px;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    width: auto;
+    min-width: 100px;
 }
 
 .btn-nice {
@@ -487,9 +501,8 @@ body::before {
     backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    transition: transform 0.1s;
-    /* Reduced from 0.3s for scroll responsiveness, or removed if handled by JS? */
-    /* Note: If JS drives transform every frame, we should REMOVE CSS transition for transform to avoid lag/conflict */
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    /* Removed transition: transform 0.1s */
     position: relative;
     will-change: transform, opacity;
     transform-origin: center top;
@@ -615,7 +628,8 @@ body::before {
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background 0.2s, box-shadow 0.2s;
+    /* Removed transform transition */
     letter-spacing: 0.5px;
     text-align: center;
 }

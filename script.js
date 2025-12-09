@@ -1102,53 +1102,75 @@
             const list = document.querySelector('.games-grid');
             if (!list) return;
 
-            const handleScroll = () => {
+            let ticking = false;
+
+            const updateList = () => {
                 const viewportHeight = list.clientHeight;
                 const items = Array.from(list.querySelectorAll('.game-card'));
-                const listRect = list.getBoundingClientRect();
+
+                // Trigger earlier for the 3rd card to tuck it behind
+                // We can use a curve or just a consistent trigger
+                const triggerY = viewportHeight - 160; // Increased from 140 to start earlier
 
                 items.forEach((item, index) => {
-                    const rect = item.getBoundingClientRect();
-                    // Calculate position relative to container
-                    // We want logic based on "how close to bottom".
-                    // But we have to be careful with "getBoundingClientRect" inside scroll loops if performance matters.
-                    // Ideally we use offsetTop.
+                    // Optimized: use offsetTop if possible to avoid layout thrashing loop? 
+                    // But we need relative pos to scroll. 
+                    // item.offsetTop is relative to parent (scroller)
 
-                    const relativeTop = item.offsetTop - list.scrollTop;
-                    const triggerY = viewportHeight - 140; // Stack starts 140px from bottom
+                    const itemTop = item.offsetTop;
+                    const scrollTop = list.scrollTop;
+                    const relativeTop = itemTop - scrollTop;
 
-                    // Enforce Z-Index reverse order so lower items go behind
                     item.style.zIndex = 100 - index;
 
                     if (relativeTop > triggerY) {
                         const diff = relativeTop - triggerY;
 
-                        // Scale down: 1.0 -> 0.85 approx
-                        const scale = Math.max(0.85, 1 - (diff * 0.001));
+                        // Stronger overlap params
+                        // Scale: 1.0 -> 0.90
+                        const scale = Math.max(0.90, 1 - (diff * 0.0008)); // Slower scaling
 
-                        // Translate up: Squish them together
-                        const translateY = -diff * 0.85;
+                        // Translate UP more aggressively to hide
+                        // If "Hide slightly behind roulette", we want the gap to reduce.
+                        const translateY = -diff * 0.95; // Stronger pull up
 
-                        // Opacity: Fade out slightly deep in stack
-                        const opacity = Math.max(0.6, 1 - (diff * 0.002));
-
-                        // Brightness check (darken lower items)
-                        // Using filter might be heavy, lets stick to opacity for now as per design "hide under".
+                        const opacity = Math.max(0.5, 1 - (diff * 0.003));
 
                         item.style.transform = `translateY(${translateY}px) scale(${scale})`;
                         item.style.opacity = opacity;
+
+                        // Blur effect for hidden items 
+                        // "blur of buttons disappears" - ensuring we add it
+                        // Using filter is expensive but requested? 
+                        // "blur of buttons disappears" implies there WAS a blur or user wants one.
+                        // I will add backdrop-filter or filter to the item itself? 
+                        // opacity is usually enough, but let's try filter if performance allows
+                        item.style.filter = `blur(${Math.min(5, diff * 0.02)}px)`;
+
                     } else {
-                        // Reset if in main view
                         item.style.transform = 'translateY(0) scale(1)';
                         item.style.opacity = '1';
+                        item.style.filter = 'none';
                     }
                 });
+                ticking = false;
             };
 
-            list.addEventListener('scroll', handleScroll);
-            // Also trigger on resize or init
-            window.addEventListener('resize', handleScroll);
-            setTimeout(handleScroll, 100); // Initial
+            list.addEventListener('scroll', () => {
+                if (!ticking) {
+                    window.requestAnimationFrame(updateList);
+                    ticking = true;
+                }
+            });
+
+            // Also trigger on resize
+            window.addEventListener('resize', updateList);
+
+            // Expose for external calls (e.g. returning to menu)
+            app.updateListPositions = updateList;
+
+            // Initial call
+            setTimeout(updateList, 100);
         },
 
 
@@ -1317,6 +1339,10 @@
                 case 'menu':
                     app.updateUI();
                     app.switchScreen('screen-menu');
+                    if (app.updateListPositions) {
+                        // Force update after layout (give a small tick for display block to apply)
+                        setTimeout(app.updateListPositions, 50);
+                    }
                     break;
                 case 'starfall':
                     // If manually typed, we prepare. If via button, tryStartGame checked cooldown.
@@ -1440,7 +1466,7 @@
                 const h = Math.floor(rouRem / 3600000);
                 const m = Math.floor((rouRem % 3600000) / 60000);
                 const s = Math.floor((rouRem % 60000) / 1000);
-                rouTimer.innerHTML = `До следующей игры:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                rouTimer.innerHTML = `До следующей крутки:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
 
                 // Update Menu Button too
                 document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}`;
@@ -1500,7 +1526,7 @@
                         const m = Math.floor((rRem % 3600000) / 60000);
                         const s = Math.floor((rRem % 60000) / 1000);
                         const display = document.getElementById('roulette-timer-display');
-                        if (display) display.innerHTML = `До следующей игры:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                        if (display) display.innerHTML = `До следующей крутки:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
 
                         // Update Menu Button
                         const el = document.getElementById('timer-roulette');
