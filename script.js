@@ -85,8 +85,49 @@
         }
     };
 
+    // --- Secure Storage ---
+    // Hides balance and critical data behind a closure with checksum validation
+    const SecureStore = (() => {
+        let _balance = 0;
+        let _salt = SECURITY.salt;
+        let _checksum = SECURITY.hash("0" + _salt);
+
+        const validate = () => {
+            if (SECURITY.hash(_balance + _salt) !== _checksum) {
+                console.warn("Security Breach Detected: Balance Integrity Fail");
+                _balance = 0; // Reset on tampering
+                _checksum = SECURITY.hash(_balance + _salt);
+                return false;
+            }
+            return true;
+        };
+
+        const updateChecksum = () => {
+            _checksum = SECURITY.hash(_balance + _salt);
+        };
+
+        return {
+            getBalance: () => {
+                validate();
+                return _balance;
+            },
+            addBalance: (amount) => {
+                if (!validate()) return 0;
+                _balance += amount;
+                updateChecksum();
+                return _balance;
+            },
+            setBalance: (amount) => {
+                _balance = amount;
+                updateChecksum();
+            },
+            // Helper for save/load
+            serialize: () => _balance,
+        };
+    })();
+
     const STATE = {
-        balance: 0,
+        // balance removed, use SecureStore
         cookies: 0,
         inventory: [],
         games: {
@@ -267,7 +308,7 @@
         },
 
         spawnEntity: () => {
-            const size = 55; // Increased from 30
+            const size = 35; // Reduced from 55 (and orig 30) for better playability
             const rand = Math.random();
             const level = STATE.games.starfall.level;
             const isBuff = STATE.games.starfall.buff;
@@ -850,7 +891,7 @@
             else if (cupsGame.correctGuesses === 3) reward = CONFIG.cups.baseReward3 + bonus;
 
             if (reward > 0) {
-                STATE.balance += reward;
+                SecureStore.addBalance(reward);
                 win = true;
 
                 if (STATE.games.cups.level < 12) STATE.games.cups.level++;
@@ -921,21 +962,54 @@
             app.startTicks();
             app.bindEvents();
 
+            // Initial Route
+            const hash = window.location.hash.replace('#', '');
+            if (hash) {
+                const screenId = 'screen-' + hash;
+                if (document.getElementById(screenId)) {
+                    app.switchScreen(screenId, false);
+                } else {
+                    app.switchScreen('screen-loading', false);
+                }
+            } else {
+                app.switchScreen('screen-loading', false);
+            }
+
             // Preload Images
             const preloadLose = new Image(); preloadLose.src = 'dedlose.png';
             const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
         },
 
         bindEvents: () => {
+            // Using history aware navigation
             document.getElementById('btn-start-adventure').addEventListener('click', app.showMenu);
             document.getElementById('timer-starfall').addEventListener('click', () => app.tryStartGame('starfall'));
+            // ... (keep existing simple listeners, switchScreen handles history)
             document.getElementById('timer-roulette').addEventListener('click', app.openRoulette);
             document.getElementById('btn-rules-starfall').addEventListener('click', () => app.showRules('starfall'));
             document.getElementById('btn-close-rules').addEventListener('click', app.closeRules);
-            document.getElementById('btn-result-menu').addEventListener('click', app.showMenu);
+            document.getElementById('btn-result-menu').addEventListener('click', () => { window.history.back(); }); // Or showMenu, but Back is safer for history flow? Ideally showMenu is a forward nav or a reset. Let's use showMenu which pushes state.
 
             document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
-            document.getElementById('btn-roulette-back').addEventListener('click', app.showMenu);
+            document.getElementById('btn-roulette-back').addEventListener('click', () => { window.history.back(); });
+
+            // History Popstate
+            window.addEventListener('popstate', (event) => {
+                if (event.state && event.state.screenId) {
+                    app.switchScreen(event.state.screenId, false);
+                } else {
+                    // Default to menu if no state (e.g. initial load pop)
+                    const hash = window.location.hash.replace('#', '');
+                    if (hash) {
+                        const screenId = 'screen-' + hash;
+                        if (document.getElementById(screenId)) {
+                            app.switchScreen(screenId, false);
+                            return;
+                        }
+                    }
+                    app.showMenu();
+                }
+            });
 
             document.getElementById('btn-claim-reward').addEventListener('click', app.claimReward);
             document.getElementById('btn-sell-reward').addEventListener('click', app.sellReward);
@@ -967,7 +1041,7 @@
                     cupsGame.start();
                 }, 2000);
             });
-            document.getElementById('btn-cups-back').addEventListener('click', app.showMenu);
+            document.getElementById('btn-cups-back').addEventListener('click', () => { window.history.back(); });
 
             window.addEventListener('resize', () => {
                 if (document.getElementById('screen-game').classList.contains('active-screen')) starfallGame.resize();
@@ -979,7 +1053,7 @@
             if (saved) {
                 const parsed = SECURITY.load(saved);
                 if (parsed) {
-                    STATE.balance = parsed.balance || 0;
+                    if (parsed.balance !== undefined) SecureStore.setBalance(parsed.balance);
                     STATE.cookies = parsed.cookies || 0;
                     if (parsed.games) {
                         STATE.games.starfall = { ...STATE.games.starfall, ...parsed.games.starfall };
@@ -991,7 +1065,9 @@
         },
 
         saveState: () => {
-            const encryptedData = SECURITY.save(STATE);
+            // Create a copy to save, injecting balance
+            const saveObj = { ...STATE, balance: SecureStore.getBalance() };
+            const encryptedData = SECURITY.save(saveObj);
             if (encryptedData) localStorage.setItem('newyear_marathon_save_v2', encryptedData);
         },
 
@@ -1008,15 +1084,23 @@
             }
         },
 
-        switchScreen: (screenId) => {
+        switchScreen: (screenId, updateHistory = true) => {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
-            document.getElementById(screenId).classList.add('active-screen');
+            const screen = document.getElementById(screenId);
+            if (screen) screen.classList.add('active-screen');
 
             // Backgrounds
             document.body.className = '';
             if (screenId === 'screen-game') document.body.classList.add('bg-starfall');
             if (screenId === 'screen-roulette') document.body.classList.add('bg-roulette');
             if (screenId === 'screen-cups-game') document.body.classList.add('bg-cups');
+
+            // History Management
+            if (updateHistory) {
+                // Determine clean hash
+                const hash = screenId.replace('screen-', '');
+                history.pushState({ screenId }, null, `#${hash}`);
+            }
         },
 
         showMenu: () => {
@@ -1064,7 +1148,7 @@
         },
 
         updateUI: () => {
-            document.getElementById('user-balance').innerText = STATE.balance;
+            document.getElementById('user-balance').innerText = SecureStore.getBalance();
 
             // Starfall Timer
             const starBtn = document.getElementById('timer-starfall');
@@ -1221,7 +1305,7 @@
             if (win) {
                 const level = STATE.games[gameId].level;
                 const reward = CONFIG[gameId].baseReward + (level - 1) * CONFIG[gameId].levelRewardStep;
-                STATE.balance += reward;
+                SecureStore.addBalance(reward);
                 STATE.games[gameId].lastPlayed = Date.now();
 
                 // Max level 12 logic
@@ -1372,7 +1456,7 @@
 
         claimReward: () => {
             const r = app.currentReward;
-            if (r.type === 'currency') STATE.balance += r.val;
+            if (r.type === 'currency') SecureStore.addBalance(r.val);
             if (r.type === 'extra_spin') STATE.games.roulette.extraSpins += r.val;
             if (r.type === 'buff') STATE.games.starfall.buff = true;
             if (r.type === 'item') STATE.cookies += r.val; // Assuming item is cookie
@@ -1385,7 +1469,7 @@
         sellReward: () => {
             const r = app.currentReward;
             if (r.sell > 0) {
-                STATE.balance += r.sell;
+                SecureStore.addBalance(r.sell);
                 app.saveState();
                 app.closeRouletteModal();
             }
