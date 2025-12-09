@@ -237,8 +237,9 @@ body::before {
 }
 
 .btn-main.small-btn {
-    padding: 10px 25px;
-    font-size: 1rem;
+    padding: 14px 30px;
+    /* Increased from 10px 25px */
+    font-size: 1.1rem;
     margin-top: 15px;
     box-shadow: 0 5px 15px rgba(221, 36, 118, 0.3);
 }
@@ -269,8 +270,9 @@ body::before {
 }
 
 .btn-nice.small-btn {
-    padding: 8px 20px;
-    font-size: 0.9rem;
+    padding: 12px 25px;
+    /* Increased from 8px 20px */
+    font-size: 1rem;
     margin-top: 10px;
 }
 
@@ -441,7 +443,14 @@ body::before {
     max-width: 500px;
     margin: 0 auto;
     overflow-y: auto;
-    padding: 10px 5px 60px 5px;
+    padding: 10px 5px 100px 5px;
+    /* Increased bottom padding for better scroll */
+    flex: 1;
+    /* Allow taking available space */
+    min-height: 0;
+    /* Enable scrolling in flex container */
+    scrollbar-width: none;
+    /* Firefox */
 }
 
 /* Scrollbar hide */
@@ -460,7 +469,8 @@ body::before {
     overflow: hidden;
     display: flex;
     align-items: center;
-    padding: 40px 25px;
+    padding: 50px 30px;
+    /* Increased padding */
     backdrop-filter: blur(15px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
@@ -553,7 +563,8 @@ body::before {
 
 .card-info h3 {
     margin-bottom: 8px;
-    font-size: 1.4rem;
+    font-size: 1.6rem;
+    /* Increased font size */
     font-weight: 800;
 }
 
@@ -577,8 +588,10 @@ body::before {
     background: linear-gradient(135deg, #FF9966, #FF5E62);
     /* Warm Gradient */
     color: white;
-    padding: 10px 20px;
-    min-width: 100px;
+    padding: 14px 30px;
+    /* Increased padding */
+    min-width: 120px;
+    /* Increased width */
     border-radius: 50px;
     /* Pill shape */
     font-size: 0.95rem;
@@ -610,8 +623,10 @@ body::before {
 }
 
 .btn-rules {
-    width: 36px;
-    height: 36px;
+    width: 48px;
+    /* Increased from 36px */
+    height: 48px;
+    /* Increased from 36px */
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.15);
     border: 1px solid rgba(255, 255, 255, 0.3);
