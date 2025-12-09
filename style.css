@@ -585,23 +585,40 @@ body::before {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    background: linear-gradient(135deg, #FF9966, #FF5E62);
-    /* Warm Gradient */
+    background: rgba(255, 255, 255, 0.1);
     color: white;
-    padding: 14px 30px;
-    /* Increased padding */
+    padding: 14px 25px;
     min-width: 120px;
-    /* Increased width */
-    border-radius: 50px;
-    /* Pill shape */
-    font-size: 0.95rem;
-    font-weight: 800;
+    border-radius: 20px;
+    font-size: 1rem;
+    font-weight: 700;
     text-transform: uppercase;
-    box-shadow: 0 4px 15px rgba(255, 94, 98, 0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     cursor: pointer;
     transition: all 0.2s;
     letter-spacing: 0.5px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: center;
+}
+
+.card-status:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Green "Play" State */
+.card-status.play-ready {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 0.8), rgba(39, 174, 96, 0.8));
+    border: 1px solid rgba(46, 204, 113, 0.5);
+    box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4);
+}
+
+.card-status.play-ready:hover {
+    background: linear-gradient(135deg, rgba(46, 204, 113, 1), rgba(39, 174, 96, 1));
+    box-shadow: 0 6px 20px rgba(46, 204, 113, 0.6);
 }
 
 .card-status:hover {
@@ -614,12 +631,12 @@ body::before {
 }
 
 .card-status.cooldown {
-    background: linear-gradient(135deg, #4b6cb7, #182848);
-    /* Cool blue/grey for wait */
-    color: rgba(255, 255, 255, 0.7);
-    box-shadow: none;
+    background: rgba(25, 30, 45, 0.8);
+    color: rgba(255, 255, 255, 0.5);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
     cursor: not-allowed;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+
 }
 
 .btn-rules {
@@ -686,6 +703,7 @@ body::before {
     gap: 10px;
 }
 
+/* Starfall Stats (Legacy for now, or update if possible) */
 .score-board,
 .timer-board,
 .level-board {
@@ -700,6 +718,85 @@ body::before {
     border: 1px solid rgba(255, 255, 255, 0.1);
     backdrop-filter: blur(5px);
     white-space: nowrap;
+}
+
+/* Glass Header (Cups) */
+.glass-header {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 10px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.gh-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.gh-value {
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 800;
+    margin-top: 2px;
+}
+
+.gh-timer {
+    color: #ffd700;
+    font-size: 1.8rem;
+    font-weight: 900;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+}
+
+/* Cups Hint Arrow */
+.cup-hint-arrow {
+    position: absolute;
+    top: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: url('arrow_down.png') no-repeat center bottom / contain;
+    /* We can construct with CSS safely */
+    animation: bounceHide 1s ease-in-out infinite;
+    z-index: 50;
+    pointer-events: none;
+}
+
+/* CSS Arrow alternative if image fails */
+.cup-hint-arrow::after {
+    content: '⬇';
+    font-size: 40px;
+    color: #ffd700;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    text-shadow: 0 0 10px #ffd700;
+}
+
+@keyframes bounceHide {
+
+    0%,
+    100% {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    50% {
+        transform: translateX(-50%) translateY(-10px);
+    }
 }
 
 .score-board img {
@@ -924,7 +1021,6 @@ body::before {
     .card-status {
         width: auto;
         /* No full width */
-        min-width: 100px;
         text-align: center;
         margin-bottom: 0;
         padding: 8px 15px;
