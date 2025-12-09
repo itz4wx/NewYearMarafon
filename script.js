@@ -98,7 +98,8 @@
             cups: {
                 lastPlayed: 0,
                 level: 1,
-                hintActive: false // New hint state
+                hints: 0,
+                hintActive: false
             },
             roulette: {
                 lastPlayed: 0,
@@ -322,6 +323,11 @@
                         starfallGame.score++;
                     } else {
                         starfallGame.score = Math.max(0, starfallGame.score - 5);
+                        const scoreEl = document.getElementById('game-score');
+                        if (scoreEl) {
+                            scoreEl.classList.add('score-damage');
+                            setTimeout(() => scoreEl.classList.remove('score-damage'), 1000);
+                        }
                     }
                     document.getElementById('game-score').innerText = starfallGame.score;
 
@@ -593,6 +599,20 @@
             cupsGame.container.innerHTML = '';
             cupsGame.message.innerText = "Следи за предметом!";
 
+            // Reset Timer Display Immediately
+            const timerEl = document.getElementById('cups-time');
+            if (timerEl) timerEl.innerText = "10";
+
+            // New round - reset active hint state for safety, or keep?
+            // "Updated timer... round starts... hint player will have until he uses it."
+            // If he uses it, it's consumed. If he doesn't, does he keep it? 
+            // "Button with hint... writes 0 and not clickable"
+            // So if he has hints in inventory, badge > 0.
+            // When he clicks, hintActive = true.
+            // Reset active hint at start of round (it applies to the specific shuffle).
+            STATE.games.cups.hintActive = false;
+            cupsGame.updateHintButton();
+
             // Determine assets
             // Level 1: sk1, Lvl 2: sk2, Lvl 3: sk3, Lvl 4: sk1...
             const cupImgSrc = `sk${(cupsGame.currentLevel - 1) % 3 + 1}.png`;
@@ -642,26 +662,6 @@
             setTimeout(() => {
                 cupsGame.animateReveal(itemImgSrc, targetWrapper);
             }, 500);
-
-            // Apply Hint if active
-            if (STATE.games.cups.hintActive) {
-                // Show hint on the correct cup
-                const hintEl = document.createElement('div');
-                hintEl.className = 'cup-hint-arrow';
-                cupsGame.cups[cupsGame.targetCupIndex].el.appendChild(hintEl);
-
-                // Hint applies only once per activation (so one game session? Or one round? Code says "next level (only 1 time)").
-                // Assuming "next level" means "next game session". 
-                // However, rounds cycle 3 times per game.
-                // If the user wants "next level", they probably mean the whole game session (3 rounds).
-                // Or "next round"? "in next lvl (only 1 time)".
-                // I will keep it active for the whole game (all 3 rounds) or just one round?
-                // "if player picks correct, it counts as win even with hint".
-                // I'll consume it at the END of the game or keep it for all 3 rounds?
-                // "Once check"
-                // Let's assume it works for the whole game session (3 rounds) then resets. 
-                // Because if they pay 300 snow, 1 round is too little.
-            }
         },
 
         animateReveal: (itemSrc, targetEl) => {
@@ -871,6 +871,44 @@
 
             // Show Result
             app.finishCupGame(cupsGame.correctGuesses, reward);
+        },
+
+        updateHintButton: () => {
+            const btn = document.getElementById('btn-cups-hint');
+            const badge = document.getElementById('cups-hint-count');
+            const count = STATE.games.cups.hints || 0;
+
+            if (badge) badge.innerText = count;
+
+            if (count > 0 && !STATE.games.cups.hintActive) {
+                btn.classList.remove('disabled');
+            } else {
+                btn.classList.add('disabled');
+            }
+        },
+
+        useHint: () => {
+            // User says: "On the button will be written digit... till he uses it."
+            // Assuming usage is allowed during the round (shuffle or guess).
+            // Check if game is in progress?
+            if (!cupsGame.isAnimating && cupsGame.timeLeft <= 0) return;
+            // We allow usage even during shuffle for better feedback
+
+            if (STATE.games.cups.hints > 0 && !STATE.games.cups.hintActive) {
+                STATE.games.cups.hints--;
+                STATE.games.cups.hintActive = true;
+                cupsGame.updateHintButton();
+
+                // Show Arrow
+                // Check if cups exist
+                if (cupsGame.cups && cupsGame.cups[cupsGame.targetCupIndex]) {
+                    const hintEl = document.createElement('div');
+                    hintEl.className = 'cup-hint-arrow';
+                    cupsGame.cups[cupsGame.targetCupIndex].el.appendChild(hintEl);
+                }
+
+                app.saveState();
+            }
         }
     };
 
@@ -882,6 +920,10 @@
             app.updateUI();
             app.startTicks();
             app.bindEvents();
+
+            // Preload Images
+            const preloadLose = new Image(); preloadLose.src = 'dedlose.png';
+            const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
         },
 
         bindEvents: () => {
@@ -912,6 +954,7 @@
             });
 
             // Cups Events
+            document.getElementById('btn-cups-hint').addEventListener('click', cupsGame.useHint);
             document.getElementById('timer-cups').addEventListener('click', () => app.tryStartGame('cups'));
             document.getElementById('btn-rules-cups').addEventListener('click', () => app.showRules('cups'));
             document.getElementById('btn-start-cups').addEventListener('click', () => {
@@ -1189,6 +1232,7 @@
                 }
 
                 resultTitle.innerText = "Победа!";
+                // Ensure image is correct immediately, even if previous was lose
                 resultImg.src = "dedpobeda.png";
                 resultMsg.innerText = `Уровень ${STATE.games[gameId].level} открыт!`;
                 rewardBox.innerHTML = `<span>+${reward}</span> <img src="zima.png" class="currency-icon">`;
@@ -1332,7 +1376,7 @@
             if (r.type === 'extra_spin') STATE.games.roulette.extraSpins += r.val;
             if (r.type === 'buff') STATE.games.starfall.buff = true;
             if (r.type === 'item') STATE.cookies += r.val; // Assuming item is cookie
-            if (r.id === 'cup_hint') STATE.games.cups.hintActive = true;
+            if (r.id === 'cup_hint') STATE.games.cups.hints = (STATE.games.cups.hints || 0) + 1;
 
             app.saveState();
             app.closeRouletteModal();

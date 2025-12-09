@@ -208,20 +208,24 @@ body::before {
 
 .timer-display {
     background: #4a5568;
-    /* Disabled button color */
     color: #ffd700;
-    /* Gold text for timer */
-    padding: 18px 45px;
-    font-size: 1.3rem;
-    border-radius: 50px;
+    padding: 10px 20px;
+    font-size: 1.1rem;
+    border-radius: 20px;
     font-weight: 800;
     box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
     font-family: var(--font-main);
     text-transform: uppercase;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
     margin-top: 30px;
-    display: inline-block;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     border: 2px solid rgba(255, 215, 0, 0.3);
+    line-height: 1.2;
+    min-width: 280px;
 }
 
 .btn-main::after {
@@ -829,6 +833,72 @@ body::before {
     text-align: center;
 }
 
+/* Starfall Damage Effect */
+.score-damage {
+    color: #ff3d3d !important;
+    transform: scale(1.3);
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Cups Hint Button */
+.btn-round-hint {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #2a2a2a, #000);
+    border: 2px solid #ffd700;
+    color: #ffd700;
+    font-weight: bold;
+    font-size: 1.2rem;
+    display: flex;
+    /* Initially hidden or visible? We'll rely on JS to show/hide or disable */
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
+    cursor: pointer;
+    z-index: 100;
+    transition: all 0.2s;
+}
+
+.btn-round-hint img {
+    width: 60%;
+    height: 60%;
+    object-fit: contain;
+}
+
+.btn-round-hint .hint-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ff3d3d;
+    color: white;
+    font-size: 0.8rem;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid white;
+}
+
+.btn-round-hint:active {
+    transform: scale(0.95);
+}
+
+.btn-round-hint.disabled {
+    opacity: 0.5;
+    filter: grayscale(1);
+    cursor: not-allowed;
+    box-shadow: none;
+    border-color: #555;
+    color: #555;
+}
+
 @keyframes hintPulse {
 
     0%,
@@ -839,6 +909,8 @@ body::before {
     50% {
         opacity: 1;
     }
+}
+}
 }
 
 /* --- Result Screen --- */
