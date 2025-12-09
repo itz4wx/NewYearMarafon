@@ -643,6 +643,40 @@ body::before {
     transform: scale(0.95);
 }
 
+/* --- Glass Action Button (New for Roulette) --- */
+.btn-glass-action {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    padding: 18px 45px;
+    font-size: 1.3rem;
+    border-radius: 50px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: all 0.2s;
+    font-family: var(--font-main);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-top: 30px;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-glass-action:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-glass-action:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.15);
+}
+
 .card-status.cooldown {
     background: rgba(25, 30, 45, 0.8);
     color: rgba(255, 255, 255, 0.5);
@@ -1509,5 +1543,20 @@ body::before {
 
     50% {
         transform: translateY(-10px) scale(1.05);
+    }
+}
+
+/* Mobile Adjustments for Cups Hint */
+@media (max-width: 480px) {
+    .btn-round-hint {
+        top: auto !important;
+        right: auto !important;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60px;
+        height: 60px;
+        z-index: 100;
+        /* Above decorations */
     }
 }

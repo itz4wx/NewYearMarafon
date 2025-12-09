@@ -147,7 +147,9 @@
                 nextFreeSpin: 0,
                 extraSpins: 0
             }
-        }
+        },
+        // Router state helper
+        currentHash: ''
     };
 
     let sessionGameStartTime = 0;
@@ -443,8 +445,31 @@
 
             // Generate pool based on weights for random fill, but for visual track we just repeat list
             // Create many items to simulate infinite scroll
+            let lastRareIndex = -10; // Track last rare item position
+
             for (let i = 0; i < 100; i++) {
-                const r = rewards[Math.floor(Math.random() * rewards.length)];
+                let r = rewards[Math.floor(Math.random() * rewards.length)];
+
+                // Check for clumping of rare items
+                const isRare = (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint' || r.type === 'special' || r.type === 'buff');
+
+                if (isRare) {
+                    const distance = i - lastRareIndex;
+                    // If too close (within 5 items), 80% chance to reroll to something common
+                    if (distance < 5) {
+                        if (Math.random() < 0.8) {
+                            // Reroll to junk or small currency
+                            const common = rewards.filter(x => x.type === 'junk' || x.val <= 10);
+                            r = common[Math.floor(Math.random() * common.length)];
+                        } else {
+                            // Allowed to exist (20% chance)
+                            lastRareIndex = i;
+                        }
+                    } else {
+                        lastRareIndex = i;
+                    }
+                }
+
                 rouletteGame.items.push(r);
                 const el = document.createElement('div');
                 el.className = 'roulette-item';
@@ -460,6 +485,13 @@
                 if (r.id === 'cup_hint') {
                     el.style.border = '2px solid #ffd700';
                     el.style.boxShadow = '0 0 15px #ffd700';
+                }
+
+                // Explicitly ensure snow10 never gets borders even if logic changes elsewhere
+                if (r.id === 'snow10') {
+                    el.classList.remove('rare', 'super-rare');
+                    el.style.border = 'none';
+                    el.style.boxShadow = 'none';
                 }
 
                 el.innerHTML = `<img src="${r.img}"><span>${r.name}</span>`;
@@ -748,9 +780,10 @@
             const startTime = Date.now();
 
             // Speed based on level
-            // Lvl 1: Slow (~800ms). Lvl 12: Fast (~200ms).
+            // Speed based on level
+            // Lvl 1: Faster (~850ms). Lvl 12: Super Fast (~200ms).
             const level = cupsGame.currentLevel;
-            const speed = Math.max(200, 900 - ((level - 1) * 60));
+            const speed = Math.max(200, 850 - ((level - 1) * 75));
 
             const posPercents = [5, 35, 65];
 
@@ -963,16 +996,10 @@
             app.bindEvents();
 
             // Initial Route
-            const hash = window.location.hash.replace('#', '');
-            if (hash) {
-                const screenId = 'screen-' + hash;
-                if (document.getElementById(screenId)) {
-                    app.switchScreen(screenId, false);
-                } else {
-                    app.switchScreen('screen-loading', false);
-                }
-            } else {
-                app.switchScreen('screen-loading', false);
+            app.handleHash();
+            if (!window.location.hash) {
+                // Default to loading if no hash
+                window.location.hash = 'loading';
             }
 
             // Preload Images
@@ -981,38 +1008,25 @@
         },
 
         bindEvents: () => {
-            // Using history aware navigation
-            document.getElementById('btn-start-adventure').addEventListener('click', app.showMenu);
+            // Using hash navigation
+            document.getElementById('btn-start-adventure').addEventListener('click', () => { window.location.hash = 'menu'; });
             document.getElementById('timer-starfall').addEventListener('click', () => app.tryStartGame('starfall'));
-            // ... (keep existing simple listeners, switchScreen handles history)
-            document.getElementById('timer-roulette').addEventListener('click', app.openRoulette);
+
+            document.getElementById('timer-roulette').addEventListener('click', () => { window.location.hash = 'roulette'; });
             document.getElementById('btn-rules-starfall').addEventListener('click', () => app.showRules('starfall'));
             document.getElementById('btn-close-rules').addEventListener('click', app.closeRules);
-            document.getElementById('btn-result-menu').addEventListener('click', () => { window.history.back(); }); // Or showMenu, but Back is safer for history flow? Ideally showMenu is a forward nav or a reset. Let's use showMenu which pushes state.
+            document.getElementById('btn-result-menu').addEventListener('click', () => { window.location.hash = 'menu'; });
 
             document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
-            document.getElementById('btn-roulette-back').addEventListener('click', () => { window.history.back(); });
+            document.getElementById('btn-roulette-back').addEventListener('click', () => { window.location.hash = 'menu'; });
 
-            // History Popstate
-            window.addEventListener('popstate', (event) => {
-                if (event.state && event.state.screenId) {
-                    app.switchScreen(event.state.screenId, false);
-                } else {
-                    // Default to menu if no state (e.g. initial load pop)
-                    const hash = window.location.hash.replace('#', '');
-                    if (hash) {
-                        const screenId = 'screen-' + hash;
-                        if (document.getElementById(screenId)) {
-                            app.switchScreen(screenId, false);
-                            return;
-                        }
-                    }
-                    app.showMenu();
-                }
-            });
+            // Hash Change Listener (The Router)
+            window.addEventListener('hashchange', app.handleHash);
 
             document.getElementById('btn-claim-reward').addEventListener('click', app.claimReward);
             document.getElementById('btn-sell-reward').addEventListener('click', app.sellReward);
+
+
 
             // Result Screen Next Level
             document.getElementById('btn-next-level').addEventListener('click', (e) => {
@@ -1037,11 +1051,12 @@
                 const tip = document.getElementById('game-tip');
                 if (tip) tip.innerText = "Совет: Следи за стаканчиком очень внимательно!";
 
-                setTimeout(() => {
-                    cupsGame.start();
-                }, 2000);
+                // setTimeout(() => {
+                //     cupsGame.start();
+                // }, 2000);
+                window.location.hash = 'cups-game';
             });
-            document.getElementById('btn-cups-back').addEventListener('click', () => { window.history.back(); });
+            document.getElementById('btn-cups-back').addEventListener('click', () => { window.location.hash = 'menu'; });
 
             window.addEventListener('resize', () => {
                 if (document.getElementById('screen-game').classList.contains('active-screen')) starfallGame.resize();
@@ -1084,7 +1099,8 @@
             }
         },
 
-        switchScreen: (screenId, updateHistory = true) => {
+        switchScreen: (screenId) => {
+            // Pure UI Switch
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
             const screen = document.getElementById(screenId);
             if (screen) screen.classList.add('active-screen');
@@ -1094,28 +1110,58 @@
             if (screenId === 'screen-game') document.body.classList.add('bg-starfall');
             if (screenId === 'screen-roulette') document.body.classList.add('bg-roulette');
             if (screenId === 'screen-cups-game') document.body.classList.add('bg-cups');
+        },
 
-            // History Management
-            if (updateHistory) {
-                // Determine clean hash
-                const hash = screenId.replace('screen-', '');
-                history.pushState({ screenId }, null, `#${hash}`);
+        handleHash: () => {
+            const hash = window.location.hash.replace('#', '');
+
+            // Clean up intervals
+            if (app.resultInterval) { clearInterval(app.resultInterval); app.resultInterval = null; }
+            // Note: Game loops (requestAnimationFrame) are handled by game.end() or visibility checks normally, 
+            // but we might want to ensure they stop if we navigate away via back button.
+            if (hash !== 'starfall') starfallGame.isActive = false; // Force stop starfall if leaving
+            if (hash !== 'cups-game') cupsGame.isAnimating = false;
+
+            switch (hash) {
+                case 'loading':
+                case '':
+                    app.switchScreen('screen-loading');
+                    break;
+                case 'menu':
+                    app.updateUI();
+                    app.switchScreen('screen-menu');
+                    break;
+                case 'starfall':
+                    // If manually typed, we prepare. If via button, tryStartGame checked cooldown.
+                    // We can just prepare() here. Logic checks can be added if strict.
+                    starfallGame.prepare(); // prepare calls switchScreen('screen-game') - wait, we should just let prepare do it.
+                    // Note: prepare() calls app.switchScreen('screen-game'). That's fine.
+                    break;
+                case 'roulette':
+                    rouletteGame.init();
+                    app.switchScreen('screen-roulette');
+                    app.updateUI();
+                    break;
+                case 'cups':
+                    app.switchScreen('screen-cups-intro');
+                    break;
+                case 'cups-game':
+                    cupsGame.start();
+                    break;
+                case 'result':
+                    app.switchScreen('screen-result');
+                    break;
+                default:
+                    app.switchScreen('screen-menu');
             }
         },
 
         showMenu: () => {
-            if (app.resultInterval) {
-                clearInterval(app.resultInterval);
-                app.resultInterval = null;
-            }
-            app.updateUI();
-            app.switchScreen('screen-menu');
+            window.location.hash = 'menu';
         },
 
         openRoulette: () => {
-            app.switchScreen('screen-roulette');
-            rouletteGame.init();
-            app.updateUI(); // Ensure buttons/timers are correct
+            window.location.hash = 'roulette';
         },
 
         showRules: (gameId) => {
@@ -1285,14 +1331,16 @@
             if (gameId === 'starfall') {
                 const currentCooldown = CONFIG.starfall.baseCooldown + (STATE.games.starfall.level - 1) * CONFIG.starfall.cooldownStep;
                 if (now - STATE.games.starfall.lastPlayed < currentCooldown) return;
-                app.switchScreen('screen-game-loader');
-                setTimeout(() => starfallGame.prepare(), 2000);
+                window.location.hash = 'starfall';
+                // app.switchScreen('screen-game-loader'); // Skipping loader for URL nav, or add hash for loader
+                // setTimeout(() => starfallGame.prepare(), 2000); 
+                // Simplified: Direct go
             }
             if (gameId === 'cups') {
                 let cooldown = CONFIG.cups.baseCooldown;
                 if (STATE.games.cups.level >= 3) cooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
                 if (now - STATE.games.cups.lastPlayed < cooldown) return;
-                cupsGame.prepare();
+                window.location.hash = 'cups';
             }
         },
 
@@ -1333,7 +1381,7 @@
             // Starfall: Always hide next level button (handled by menu/cooldown)
             document.getElementById('btn-next-level').style.display = 'none';
 
-            app.switchScreen('screen-result');
+            window.location.hash = 'result';
         },
 
         finishCupGame: (correctGuesses, reward) => {
@@ -1410,7 +1458,7 @@
                 // We need to prevent it if locked.
             }
 
-            app.switchScreen('screen-result');
+            window.location.hash = 'result';
         },
 
         // Roulette Result Handling
@@ -1477,7 +1525,7 @@
 
         closeRouletteModal: () => {
             document.getElementById('modal-roulette-reward').classList.remove('active');
-            app.showMenu();
+            window.location.hash = 'menu';
         }
     };
 
