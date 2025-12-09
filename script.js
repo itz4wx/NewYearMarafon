@@ -172,18 +172,23 @@
             localStorage.setItem('isMuted', 'false');
 
             // Click Sound Setup
-            document.addEventListener('click', (e) => {
+            const handleInteraction = () => {
                 if (!soundManager.userInteracted) {
                     soundManager.userInteracted = true;
                     soundManager.playPlaylist();
                 }
+            };
 
+            document.addEventListener('click', (e) => {
+                handleInteraction();
                 // Play click for buttons or interactables
                 const target = e.target.closest('button, .card-status, .game-card, .btn-nice, .btn-main');
                 if (target) {
                     soundManager.playClick();
                 }
             });
+
+            document.addEventListener('touchstart', handleInteraction, { once: true });
         },
 
         playClick: () => {
@@ -1077,6 +1082,7 @@
             app.updateUI();
             app.startTicks();
             app.bindEvents();
+            app.initListAnimation();
 
             // Initial Route
             app.handleHash();
@@ -1090,6 +1096,59 @@
             const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
 
 
+        },
+
+        initListAnimation: () => {
+            const list = document.querySelector('.games-grid');
+            if (!list) return;
+
+            const handleScroll = () => {
+                const viewportHeight = list.clientHeight;
+                const items = Array.from(list.querySelectorAll('.game-card'));
+                const listRect = list.getBoundingClientRect();
+
+                items.forEach((item, index) => {
+                    const rect = item.getBoundingClientRect();
+                    // Calculate position relative to container
+                    // We want logic based on "how close to bottom".
+                    // But we have to be careful with "getBoundingClientRect" inside scroll loops if performance matters.
+                    // Ideally we use offsetTop.
+
+                    const relativeTop = item.offsetTop - list.scrollTop;
+                    const triggerY = viewportHeight - 140; // Stack starts 140px from bottom
+
+                    // Enforce Z-Index reverse order so lower items go behind
+                    item.style.zIndex = 100 - index;
+
+                    if (relativeTop > triggerY) {
+                        const diff = relativeTop - triggerY;
+
+                        // Scale down: 1.0 -> 0.85 approx
+                        const scale = Math.max(0.85, 1 - (diff * 0.001));
+
+                        // Translate up: Squish them together
+                        const translateY = -diff * 0.85;
+
+                        // Opacity: Fade out slightly deep in stack
+                        const opacity = Math.max(0.6, 1 - (diff * 0.002));
+
+                        // Brightness check (darken lower items)
+                        // Using filter might be heavy, lets stick to opacity for now as per design "hide under".
+
+                        item.style.transform = `translateY(${translateY}px) scale(${scale})`;
+                        item.style.opacity = opacity;
+                    } else {
+                        // Reset if in main view
+                        item.style.transform = 'translateY(0) scale(1)';
+                        item.style.opacity = '1';
+                    }
+                });
+            };
+
+            list.addEventListener('scroll', handleScroll);
+            // Also trigger on resize or init
+            window.addEventListener('resize', handleScroll);
+            setTimeout(handleScroll, 100); // Initial
         },
 
 
