@@ -398,7 +398,8 @@
             const isBuff = STATE.games.starfall.buff;
 
             // Dynamic Parasite Chance
-            let parasiteChance = CONFIG.starfall.baseParasiteChance + (level - 1) * CONFIG.starfall.parasiteChanceStep;
+            // Base 0.2, +0.03 per level, CAP at 0.35
+            let parasiteChance = Math.min(0.35, CONFIG.starfall.baseParasiteChance + (level - 1) * 0.03);
             if (isBuff) parasiteChance = 0.05; // Very low in buff mode
 
             let type = 'star';
@@ -431,8 +432,9 @@
             // Currently spawn check is per frame. Ideally should be time based accumulator.
             // Simplified: dt is in seconds. 
             const isBuff = STATE.games.starfall.buff;
-            let spawnRate = 3 + (STATE.games.starfall.level * 0.2); // Spawns per second
-            if (isBuff) spawnRate = 6;
+            // Base spawn increase + scaling
+            let spawnRate = 4 + (STATE.games.starfall.level * 0.5); // Spawns per second (Increased from 3 + 0.2)
+            if (isBuff) spawnRate = 8;
 
             // Random check adjusted for dt
             if (Math.random() < spawnRate * dt) starfallGame.spawnEntity();
@@ -1135,9 +1137,19 @@
 
                     // Bounds (Rubber band effect or hard clamp?)
                     // Hard clamp for simplicity + 0.5 buffer
+                    // Bounds (Rubber band effect)
                     const maxIndex = items.length - 1;
-                    if (scrollY < -0.5) { scrollY += (-0.5 - scrollY) * 0.2; velocity *= 0.5; }
-                    if (scrollY > maxIndex + 0.5) { scrollY += (maxIndex + 0.5 - scrollY) * 0.2; velocity *= 0.5; }
+                    // Clamp velocity if OOB?
+
+                    if (scrollY < -0.2) {
+                        // Strong pull back
+                        scrollY += (-0.0 - scrollY) * 0.2;
+                        velocity *= 0.5;
+                    }
+                    if (scrollY > maxIndex + 0.2) {
+                        scrollY += (maxIndex + 0.0 - scrollY) * 0.2;
+                        velocity *= 0.5;
+                    }
                 }
 
                 // Render
@@ -1208,8 +1220,12 @@
             // Mouse Wheel
             container.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                // Wheel delta usually 100 per tick
-                scrollY += e.deltaY * 0.005;
+                // Momentum scrolling: Add to velocity instead of direct scrollY
+                // e.deltaY is usually 100 per tick. We want 1 tick = decent push.
+                // Invert for natural feel? No, wheel down (pos) = scroll down (increase index).
+                velocity += e.deltaY * 0.001;
+
+                // Wake up loop if needed (it runs always currently)
             }, { passive: false });
 
             // Expose for external updates (screen switch reset)
@@ -1507,6 +1523,9 @@
                 rouTimer.style.display = 'none';
                 rouBtn.innerText = `КРУТИТЬ (${STATE.games.roulette.extraSpins})`;
                 rouBtn.classList.remove('cooldown');
+                // Use Gold Style
+                rouBtn.classList.remove('btn-glass-action');
+                rouBtn.classList.add('btn-gold-action');
             } else if (rouRem > 0) {
                 rouBtn.style.display = 'none';
                 rouTimer.style.display = 'block';
@@ -1522,6 +1541,10 @@
                 rouTimer.style.display = 'none';
                 rouBtn.innerText = 'КРУТИТЬ БЕСПЛАТНО';
                 rouBtn.classList.remove('cooldown');
+                // Use Gold Style
+                rouBtn.classList.remove('btn-glass-action');
+                rouBtn.classList.add('btn-gold-action');
+
                 document.getElementById('timer-roulette').innerText = 'КРУТИТЬ';
             }
         },
