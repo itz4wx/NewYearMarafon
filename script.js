@@ -58,6 +58,7 @@
             baseParasiteChance: 0.2,
             parasiteChanceStep: 0.05
         },
+
         roulette: {
             cooldown: 24 * 60 * 60 * 1000,
             spinDuration: 6000,
@@ -142,6 +143,7 @@
                 hints: 0,
                 hintActive: false
             },
+
             roulette: {
                 lastPlayed: 0,
                 nextFreeSpin: 0,
@@ -155,6 +157,103 @@
     let sessionGameStartTime = 0;
     let isGameRunning = false;
     let lastTime = 0; // For Delta Time
+
+    // --- Sound Manager ---
+    const soundManager = {
+        playlist: ['muz1.mp3', 'muz2.mp3', 'muz3.mp3', 'muz4.mp3'],
+        bgm: null,
+        isMuted: false,
+        lastTrackIndex: -1,
+        userInteracted: false,
+
+        init: () => {
+            // Restore mute state
+            const savedMute = localStorage.getItem('isMuted');
+            if (savedMute === 'true') {
+                soundManager.isMuted = true;
+                soundManager.updateMuteIcon();
+            }
+
+            // Click Sound Setup
+            document.addEventListener('click', (e) => {
+                if (!soundManager.userInteracted) {
+                    soundManager.userInteracted = true;
+                    soundManager.playPlaylist();
+                }
+
+                // Play click for buttons or interactables
+                const target = e.target.closest('button, .card-status, .game-card, .btn-nice, .btn-main');
+                if (target) {
+                    soundManager.playClick();
+                }
+            });
+
+            // Mute Button
+            const btn = document.getElementById('btn-sound-toggle');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Don't trigger click sound double?
+                    soundManager.toggleMute();
+                    soundManager.playClick(); // Feedback for mute button itself
+                });
+                soundManager.updateMuteIcon();
+            }
+        },
+
+        playClick: () => {
+            if (soundManager.isMuted) return;
+            const audio = new Audio('knopka.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(() => { });
+        },
+
+        toggleMute: () => {
+            soundManager.isMuted = !soundManager.isMuted;
+            localStorage.setItem('isMuted', soundManager.isMuted);
+            soundManager.updateMuteIcon();
+
+            if (soundManager.isMuted) {
+                if (soundManager.bgm) soundManager.bgm.pause();
+            } else {
+                if (soundManager.bgm && soundManager.bgm.paused) soundManager.bgm.play().catch(e => console.log("Play blocked", e));
+                else if (!soundManager.bgm) soundManager.playPlaylist();
+            }
+        },
+
+        updateMuteIcon: () => {
+            const btn = document.getElementById('btn-sound-toggle');
+            if (btn) btn.innerText = soundManager.isMuted ? '🔇' : '🔊';
+        },
+
+        playPlaylist: () => {
+            if (soundManager.isMuted) return;
+            if (soundManager.bgm && !soundManager.bgm.paused) return; // Already playing
+
+            let nextIndex;
+            do {
+                nextIndex = Math.floor(Math.random() * soundManager.playlist.length);
+            } while (nextIndex === soundManager.lastTrackIndex && soundManager.playlist.length > 1);
+
+            soundManager.lastTrackIndex = nextIndex;
+            const src = soundManager.playlist[nextIndex];
+
+            // Reuse object or new? New is safer for simple playlist logic
+            if (soundManager.bgm) {
+                soundManager.bgm.pause();
+                soundManager.bgm.src = "";
+            }
+
+            soundManager.bgm = new Audio(src);
+            soundManager.bgm.volume = 0.3; // Background volume lower
+            soundManager.bgm.play().catch(e => {
+                console.log("Autoplay blocked, waiting for interaction", e);
+            });
+
+            soundManager.bgm.onended = () => {
+                soundManager.playPlaylist(); // Next track
+            };
+        }
+    };
 
     // --- Starfall Game Engine ---
     const starfallGame = {
@@ -627,6 +726,7 @@
         correctGuesses: 0,
         targetCupIndex: 0, // 0, 1, 2 - where the item IS
         isAnimating: false,
+        isActive: false, // New flag for session tracking
         timerInterval: null,
         timeLeft: 10,
 
@@ -644,6 +744,7 @@
             if (!cupsGame.container) cupsGame.init();
             app.switchScreen('screen-cups-game');
             document.body.className = 'bg-cups';
+            cupsGame.isActive = true; // Mark session active
             cupsGame.currentLevel = STATE.games.cups.level;
             cupsGame.round = 0;
             cupsGame.correctGuesses = 0;
@@ -907,6 +1008,7 @@
 
         endGame: () => {
             cupsGame.isAnimating = false;
+            cupsGame.isActive = false; // Session over
             let win = false;
             let reward = 0;
             const level = cupsGame.currentLevel;
@@ -986,9 +1088,12 @@
         }
     };
 
+
+
     // --- App Controller ---
     const app = {
         init: () => {
+            soundManager.init();
             app.loadState();
             app.createSnow();
             app.updateUI();
@@ -1005,7 +1110,24 @@
             // Preload Images
             const preloadLose = new Image(); preloadLose.src = 'dedlose.png';
             const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
+
+
         },
+
+
+
+        showFloatingText: (text, color) => {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            el.style.color = color;
+            el.style.left = '50%';
+            el.style.top = '40%';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        },
+
+
 
         bindEvents: () => {
             // Using hash navigation
@@ -1019,6 +1141,8 @@
 
             document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
             document.getElementById('btn-roulette-back').addEventListener('click', () => { window.location.hash = 'menu'; });
+
+
 
             // Hash Change Listener (The Router)
             window.addEventListener('hashchange', app.handleHash);
@@ -1110,17 +1234,43 @@
             if (screenId === 'screen-game') document.body.classList.add('bg-starfall');
             if (screenId === 'screen-roulette') document.body.classList.add('bg-roulette');
             if (screenId === 'screen-cups-game') document.body.classList.add('bg-cups');
+
         },
 
         handleHash: () => {
             const hash = window.location.hash.replace('#', '');
 
-            // Clean up intervals
+            // Anti-Cheat / Clean up
             if (app.resultInterval) { clearInterval(app.resultInterval); app.resultInterval = null; }
-            // Note: Game loops (requestAnimationFrame) are handled by game.end() or visibility checks normally, 
-            // but we might want to ensure they stop if we navigate away via back button.
-            if (hash !== 'starfall') starfallGame.isActive = false; // Force stop starfall if leaving
-            if (hash !== 'cups-game') cupsGame.isAnimating = false;
+
+            // Check for mid-game exit
+            if (hash !== 'starfall' && starfallGame.isActive) {
+                // Punishment: Set cooldown
+                STATE.games.starfall.lastPlayed = Date.now();
+                starfallGame.isActive = false;
+                app.saveState();
+                // Optionally show toast? No, silent punishment or user figures it out.
+            }
+            if (hash !== 'cups-game' && cupsGame.isActive) {
+                // Punishment: Set cooldown
+                STATE.games.cups.lastPlayed = Date.now();
+                STATE.games.cups.hintActive = false;
+                cupsGame.isActive = false;
+                app.saveState();
+            }
+
+            if (hash !== 'starfall') starfallGame.isActive = false;
+            if (hash !== 'cups-game') {
+                cupsGame.isAnimating = false;
+                // cupsGame.isActive = false; // Removed this line to let logic above handle it solely? 
+                // Actually logic above sets it to false if punishment. 
+                // But if we just punish, we also need to ensure it's false for normal nav.
+                // Safe to set false here again or just let the block above handle it.
+                // If we came from cups-game and finished normally, isActive is ALREADY false (set in endGame).
+                // So the block above (hash !== 'cups-game' && cupsGame.isActive) ONLY triggers if we exited mid-game.
+                // So we don't need to force set it false here blindly, or we can to be safe.
+                cupsGame.isActive = false;
+            }
 
             switch (hash) {
                 case 'loading':
@@ -1148,6 +1298,7 @@
                 case 'cups-game':
                     cupsGame.start();
                     break;
+
                 case 'result':
                     app.switchScreen('screen-result');
                     break;
@@ -1252,7 +1403,7 @@
                 const h = Math.floor(rouRem / 3600000);
                 const m = Math.floor((rouRem % 3600000) / 60000);
                 const s = Math.floor((rouRem % 60000) / 1000);
-                rouTimer.innerText = `До следующей игры: ${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                rouTimer.innerHTML = `До следующей игры:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
 
                 // Update Menu Button too
                 document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}`;
@@ -1312,7 +1463,7 @@
                         const m = Math.floor((rRem % 3600000) / 60000);
                         const s = Math.floor((rRem % 60000) / 1000);
                         const display = document.getElementById('roulette-timer-display');
-                        if (display) display.innerText = `До следующей игры: ${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                        if (display) display.innerHTML = `До следующей игры:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
 
                         // Update Menu Button
                         const el = document.getElementById('timer-roulette');
@@ -1484,12 +1635,16 @@
 
             modalTitle.innerText = titleText;
 
+            // Premium HTML Structure
             display.innerHTML = `
-                <div class="reward-glow-container">
-                    <img src="${reward.img}" class="reward-main-img">
+                <div class="prize-glow-container">
+                    <div class="prize-rays"></div>
+                    <div class="prize-halo"></div>
+                    <img src="${reward.img}" class="reward-main-img premium-drop">
+                    <div class="prize-sparkles"></div>
                 </div>
-                <h3 style="color: #ffd700; font-size: 1.5rem; margin-top: 10px;">${reward.name}</h3>
-                <p style="color: rgba(255,255,255,0.7); font-size: 0.9rem;">${reward.type === 'junk' ? 'Ничего, повезет в любви!' : 'Отличный улов!'}</p>
+                <h3 class="premium-reward-name">${reward.name}</h3>
+                <p class="premium-reward-desc">${reward.type === 'junk' ? 'Ничего, повезет в любви!' : 'Отличный улов!'}</p>
             `;
 
             if (reward.sell > 0) {

@@ -42,9 +42,14 @@
                 <h1 class="menu-title-small">Новогодний Марафон</h1>
                 <h2>Мини-Игры</h2>
             </div>
-            <div class="balance-container">
-                <span id="user-balance">0</span>
-                <img src="zima.png" alt="Valuta" class="currency-icon">
+            <div class="header-controls" style="display: flex; gap: 10px; align-items: center;">
+                <button id="btn-sound-toggle" class="btn-icon-glass">
+                    🔊
+                </button>
+                <div class="balance-container">
+                    <span id="user-balance">0</span>
+                    <img src="zima.png" alt="Valuta" class="currency-icon">
+                </div>
             </div>
         </header>
 
@@ -94,6 +99,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Game 4: Snowball -->
+
 
             <!-- Shop (Placeholder) -->
             <div class="game-card locked">
@@ -152,6 +160,11 @@
         <canvas id="gameCanvas"></canvas>
         <div class="controls-hint">Двигай пальцем или мышкой</div>
     </section>
+
+
+
+    <!-- 4.5 Snowball Screen -->
+
 
     <!-- 5. Result Screen -->
     <section id="screen-result" class="screen">
