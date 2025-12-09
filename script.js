@@ -167,12 +167,9 @@
         userInteracted: false,
 
         init: () => {
-            // Restore mute state
-            const savedMute = localStorage.getItem('isMuted');
-            if (savedMute === 'true') {
-                soundManager.isMuted = true;
-            }
-            soundManager.updateMuteIcon(); // Ensure correct icon on load
+            // Force sound ON. Ignore text execution or saved state.
+            soundManager.isMuted = false;
+            localStorage.setItem('isMuted', 'false');
 
             // Click Sound Setup
             document.addEventListener('click', (e) => {
@@ -187,50 +184,21 @@
                     soundManager.playClick();
                 }
             });
-
-            // Mute Button
-            const btn = document.getElementById('btn-sound-toggle');
-            if (btn) {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    soundManager.toggleMute();
-                    soundManager.playClick();
-                });
-            }
         },
 
         playClick: () => {
-            if (soundManager.isMuted) return;
+            // Always play
             const audio = new Audio('knopka.mp3');
             audio.volume = 0.5;
             audio.play().catch(() => { });
         },
 
-        toggleMute: () => {
-            soundManager.isMuted = !soundManager.isMuted;
-            localStorage.setItem('isMuted', soundManager.isMuted);
-            soundManager.updateMuteIcon();
-
-            if (soundManager.isMuted) {
-                if (soundManager.bgm) soundManager.bgm.pause();
-            } else {
-                if (soundManager.bgm && soundManager.bgm.paused) soundManager.bgm.play().catch(e => console.log("Play blocked", e));
-                else if (!soundManager.bgm) soundManager.playPlaylist();
-            }
-        },
-
-        updateMuteIcon: () => {
-            const btn = document.getElementById('btn-sound-toggle');
-            if (btn) {
-                // Use images: zvuk.png (sound on) / bez.png (sound off)
-                const iconSrc = soundManager.isMuted ? 'bez.png' : 'zvuk.png';
-                btn.innerHTML = `<img src="${iconSrc}" alt="Sound" style="width: 100%; height: 100%; object-fit: contain; pointer-events: none;">`;
-            }
-        },
+        // Toggle mute removed.
+        // updateMuteIcon removed.
 
         playPlaylist: () => {
-            if (soundManager.isMuted) return;
-            if (soundManager.bgm && !soundManager.bgm.paused) return; // Already playing
+            // Always play if not already playing
+            if (soundManager.bgm && !soundManager.bgm.paused) return;
 
             let nextIndex;
             let attempts = 0;
