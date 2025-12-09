@@ -594,7 +594,7 @@
             // Calculate positions
             // Container width ~ 350-400px (mobile vs desktop).
             // We use % for responsive.
-            const posPercents = [10, 40, 70]; // Center points? No, left positions.
+            const posPercents = [5, 35, 65]; // Center points? No, left positions.
             // 3 cups.
 
             cupsGame.cups = [];
@@ -683,7 +683,7 @@
             const level = cupsGame.currentLevel;
             const speed = Math.max(200, 900 - ((level - 1) * 60));
 
-            const posPercents = [10, 40, 70];
+            const posPercents = [5, 35, 65];
 
             const doSwap = () => {
                 if (Date.now() - startTime >= DURATION) {

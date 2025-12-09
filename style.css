@@ -175,6 +175,16 @@ body::before {
     width: 100%;
     max-width: 480px;
     margin: 0 auto;
+    position: relative;
+    /* For absolute positioning context if needed */
+}
+
+.result-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    width: 100%;
+    margin-top: 20px;
 }
 
 .btn-main {
@@ -559,20 +569,31 @@ body::before {
     gap: 10px;
 }
 
+/* --- Redesigned Game Buttons --- */
 .card-status {
-    display: inline-block;
-    background: var(--primary-color);
-    padding: 10px 10px;
-    /* Reduced padding on mobile */
-    min-width: 80px;
-    text-align: center;
-    border-radius: 12px;
-    font-size: 0.9rem;
-    font-weight: bold;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(135deg, #FF9966, #FF5E62);
+    /* Warm Gradient */
+    color: white;
+    padding: 10px 20px;
+    min-width: 100px;
+    border-radius: 50px;
+    /* Pill shape */
+    font-size: 0.95rem;
+    font-weight: 800;
     text-transform: uppercase;
-    box-shadow: 0 4px 10px rgba(255, 61, 61, 0.4);
+    box-shadow: 0 4px 15px rgba(255, 94, 98, 0.4);
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.card-status:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 94, 98, 0.6);
 }
 
 .card-status:active {
@@ -580,10 +601,12 @@ body::before {
 }
 
 .card-status.cooldown {
-    background: #4a5568;
-    color: #a0aec0;
+    background: linear-gradient(135deg, #4b6cb7, #182848);
+    /* Cool blue/grey for wait */
+    color: rgba(255, 255, 255, 0.7);
     box-shadow: none;
     cursor: not-allowed;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-rules {
@@ -815,12 +838,13 @@ body::before {
     }
 
     .speech-bubble {
-        width: 150px;
-        font-size: 0.85rem;
-        top: -85px;
-        /* Higher on mobile */
-        margin-left: 10px;
-        /* Closer to center to stay on screen */
+        width: 160px;
+        font-size: 0.8rem;
+        top: -95px;
+        /* Higher to avoid face */
+        left: 55%;
+        /* Shift right */
+        margin-left: 0;
     }
 
     .speech-bubble::after {
@@ -828,27 +852,37 @@ body::before {
         transform: rotate(20deg);
     }
 
+    .result-actions {
+        flex-direction: column;
+        gap: 15px;
+    }
+
     .btn-main {
-        padding: 15px 25px;
-        font-size: 1rem;
+        padding: 15px 0;
+        /* Full width */
+        font-size: 1.1rem;
         width: 100%;
-        max-width: 300px;
+        margin-top: 0;
     }
 
     /* Fixed width buttons */
     .game-card {
-        padding: 15px;
+        padding: 20px 15px;
+        flex-direction: column;
+        align-items: flex-start;
+        text-align: left;
     }
 
     .card-image {
-        width: 70px;
-        height: 70px;
-        margin-right: 15px;
+        width: 100%;
+        height: 120px;
+        margin-right: 0;
+        margin-bottom: 15px;
     }
 
     .card-image img {
-        width: 50px;
-        height: 50px;
+        width: 80px;
+        height: 80px;
     }
 
     .score-board,
@@ -859,13 +893,17 @@ body::before {
     }
 
     .card-actions {
-        flex-wrap: wrap;
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 10px;
     }
 
     .card-status {
-        width: 100%;
+        flex: 1;
         text-align: center;
-        margin-bottom: 5px;
+        margin-bottom: 0;
+        padding: 12px 0;
+        font-size: 1rem;
     }
 }
 
@@ -889,14 +927,19 @@ body::before {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 8rem;
+    font-size: 10rem;
     font-weight: 800;
-    color: var(--accent-color);
-    text-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+    color: #ffd700;
+    /* Solid Gold */
+    text-shadow:
+        4px 4px 0px #d35400,
+        0 0 50px rgba(255, 215, 0, 0.5);
+    /* Soft glow, not harsh */
     z-index: 100;
     pointer-events: none;
     display: none;
-    font-family: var(--font-title);
+    font-family: var(--font-main);
+    /* Changed to Main font for cleaner numbers */
 }
 
 .game-countdown.active {
