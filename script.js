@@ -160,10 +160,10 @@
 
     // --- Sound Manager ---
     const soundManager = {
-        playlist: ['muz1.mp3', 'muz2.mp3', 'muz3.mp3', 'muz4.mp3'],
+        playlist: ['muz1.mp3', 'muz2.mp3', 'muz3.mp3', 'muz4.mp3', 'muz5.mp3', 'muz6.mp3', 'muz7.mp3'],
         bgm: null,
         isMuted: false,
-        lastTrackIndex: -1,
+        recentTracks: [], // History queue to prevent repeats
         userInteracted: false,
 
         init: () => {
@@ -171,8 +171,8 @@
             const savedMute = localStorage.getItem('isMuted');
             if (savedMute === 'true') {
                 soundManager.isMuted = true;
-                soundManager.updateMuteIcon();
             }
+            soundManager.updateMuteIcon(); // Ensure correct icon on load
 
             // Click Sound Setup
             document.addEventListener('click', (e) => {
@@ -192,11 +192,10 @@
             const btn = document.getElementById('btn-sound-toggle');
             if (btn) {
                 btn.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Don't trigger click sound double?
+                    e.stopPropagation();
                     soundManager.toggleMute();
-                    soundManager.playClick(); // Feedback for mute button itself
+                    soundManager.playClick();
                 });
-                soundManager.updateMuteIcon();
             }
         },
 
@@ -222,7 +221,11 @@
 
         updateMuteIcon: () => {
             const btn = document.getElementById('btn-sound-toggle');
-            if (btn) btn.innerText = soundManager.isMuted ? '🔇' : '🔊';
+            if (btn) {
+                // Use images: zvuk.png (sound on) / bez.png (sound off)
+                const iconSrc = soundManager.isMuted ? 'bez.png' : 'zvuk.png';
+                btn.innerHTML = `<img src="${iconSrc}" alt="Sound" style="width: 100%; height: 100%; object-fit: contain; pointer-events: none;">`;
+            }
         },
 
         playPlaylist: () => {
@@ -230,21 +233,28 @@
             if (soundManager.bgm && !soundManager.bgm.paused) return; // Already playing
 
             let nextIndex;
+            let attempts = 0;
+            // Try to find a track not in the last 3 played
             do {
                 nextIndex = Math.floor(Math.random() * soundManager.playlist.length);
-            } while (nextIndex === soundManager.lastTrackIndex && soundManager.playlist.length > 1);
+                attempts++;
+            } while (soundManager.recentTracks.includes(nextIndex) && attempts < 20);
 
-            soundManager.lastTrackIndex = nextIndex;
+            // Update history
+            soundManager.recentTracks.push(nextIndex);
+            if (soundManager.recentTracks.length > 3) {
+                soundManager.recentTracks.shift();
+            }
+
             const src = soundManager.playlist[nextIndex];
 
-            // Reuse object or new? New is safer for simple playlist logic
             if (soundManager.bgm) {
                 soundManager.bgm.pause();
                 soundManager.bgm.src = "";
             }
 
             soundManager.bgm = new Audio(src);
-            soundManager.bgm.volume = 0.3; // Background volume lower
+            soundManager.bgm.volume = 0.3;
             soundManager.bgm.play().catch(e => {
                 console.log("Autoplay blocked, waiting for interaction", e);
             });
