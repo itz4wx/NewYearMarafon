@@ -867,22 +867,29 @@ body::before {
 
     /* Fixed width buttons */
     .game-card {
-        padding: 20px 15px;
-        flex-direction: column;
-        align-items: flex-start;
+        padding: 15px;
+        flex-direction: row;
+        /* FORCE ROW */
+        align-items: center;
         text-align: left;
+        height: auto;
+        /* Allow growth */
+        min-height: 110px;
     }
 
     .card-image {
-        width: 100%;
-        height: 120px;
-        margin-right: 0;
-        margin-bottom: 15px;
+        width: 90px;
+        /* Restored width */
+        height: 90px;
+        margin-right: 15px;
+        margin-bottom: 0;
+        flex-shrink: 0;
+        /* Don't squash image */
     }
 
     .card-image img {
-        width: 80px;
-        height: 80px;
+        width: 60px;
+        height: 60px;
     }
 
     .score-board,
@@ -893,17 +900,20 @@ body::before {
     }
 
     .card-actions {
-        width: 100%;
-        justify-content: space-between;
-        margin-top: 10px;
+        width: auto;
+        /* Let it flow */
+        justify-content: flex-start;
+        margin-top: 5px;
     }
 
     .card-status {
-        flex: 1;
+        width: auto;
+        /* No full width */
+        min-width: 100px;
         text-align: center;
         margin-bottom: 0;
-        padding: 12px 0;
-        font-size: 1rem;
+        padding: 8px 15px;
+        font-size: 0.9rem;
     }
 }
 
@@ -1109,10 +1119,29 @@ body::before {
     box-shadow: none;
 }
 
-#btn-roulette-back:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border-color: rgba(255, 255, 255, 0.3);
+/* Secondary Action Button (Roulette) */
+.secondary-action {
+    background: rgba(255, 255, 255, 0.1) !important;
+    /* Force override gradient */
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+    margin-top: 15px;
+    box-shadow: none;
+}
+
+.secondary-action:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.custom-z-index {
+    z-index: 150;
+}
+
+.back-btn {
+    margin-top: 15px;
 }
 
 /* Mobile Adjustments for Roulette */
