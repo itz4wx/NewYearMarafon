@@ -1082,7 +1082,7 @@
             app.updateUI();
             app.startTicks();
             app.bindEvents();
-            app.initListAnimation();
+            app.initCarousel();
 
             // Initial Route
             app.handleHash();
@@ -1098,79 +1098,126 @@
 
         },
 
-        initListAnimation: () => {
-            const list = document.querySelector('.games-grid');
-            if (!list) return;
+        initCarousel: () => {
+            const container = document.querySelector('.games-grid');
+            if (!container) return;
 
-            let ticking = false;
+            // State
+            let scrollY = 0; // Visual position (0 = card 0 centered, 1 = card 1 centered)
+            let velocity = 0;
+            let isDragging = false;
+            let startY = 0;
+            let lastY = 0;
+            let lastTime = 0;
+            let targetScrollY = 0; // For snapping
+            let rafId = null;
 
-            const updateList = () => {
-                const viewportHeight = list.clientHeight;
-                const items = Array.from(list.querySelectorAll('.game-card'));
+            const items = Array.from(container.querySelectorAll('.game-card'));
+            const cardHeight = 220; // Virtual height info for spacing calculations
+            const spacing = 140; // Pixels distance between cards visually
 
-                // Trigger earlier for the 3rd card to tuck it behind
-                // We can use a curve or just a consistent trigger
-                const triggerY = viewportHeight - 160; // Increased from 140 to start earlier
+            // Animation Loop
+            const update = () => {
+                // Physics
+                if (!isDragging) {
+                    // Inertia & Snapping
+                    velocity *= 0.95; // Friction
 
-                items.forEach((item, index) => {
-                    // Optimized: use offsetTop if possible to avoid layout thrashing loop? 
-                    // But we need relative pos to scroll. 
-                    // item.offsetTop is relative to parent (scroller)
-
-                    const itemTop = item.offsetTop;
-                    const scrollTop = list.scrollTop;
-                    const relativeTop = itemTop - scrollTop;
-
-                    item.style.zIndex = 100 - index;
-
-                    if (relativeTop > triggerY) {
-                        const diff = relativeTop - triggerY;
-
-                        // Stronger overlap params
-                        // Scale: 1.0 -> 0.90
-                        const scale = Math.max(0.90, 1 - (diff * 0.0008)); // Slower scaling
-
-                        // Translate UP more aggressively to hide
-                        // If "Hide slightly behind roulette", we want the gap to reduce.
-                        const translateY = -diff * 0.95; // Stronger pull up
-
-                        const opacity = Math.max(0.5, 1 - (diff * 0.003));
-
-                        item.style.transform = `translateY(${translateY}px) scale(${scale})`;
-                        item.style.opacity = opacity;
-
-                        // Blur effect for hidden items 
-                        // "blur of buttons disappears" - ensuring we add it
-                        // Using filter is expensive but requested? 
-                        // "blur of buttons disappears" implies there WAS a blur or user wants one.
-                        // I will add backdrop-filter or filter to the item itself? 
-                        // opacity is usually enough, but let's try filter if performance allows
-                        item.style.filter = `blur(${Math.min(5, diff * 0.02)}px)`;
-
+                    // Snap to nearest integer if slow enough
+                    if (Math.abs(velocity) < 0.01) {
+                        const snapTarget = Math.round(scrollY);
+                        const diff = snapTarget - scrollY;
+                        scrollY += diff * 0.1; // Smooth snap lerp
+                        velocity = 0;
                     } else {
-                        item.style.transform = 'translateY(0) scale(1)';
-                        item.style.opacity = '1';
-                        item.style.filter = 'none';
+                        scrollY += velocity;
+                    }
+
+                    // Bounds (Rubber band effect or hard clamp?)
+                    // Hard clamp for simplicity + 0.5 buffer
+                    const maxIndex = items.length - 1;
+                    if (scrollY < -0.5) { scrollY += (-0.5 - scrollY) * 0.2; velocity *= 0.5; }
+                    if (scrollY > maxIndex + 0.5) { scrollY += (maxIndex + 0.5 - scrollY) * 0.2; velocity *= 0.5; }
+                }
+
+                // Render
+                items.forEach((item, index) => {
+                    const dist = index - scrollY; // Distance from center (0 = center)
+
+                    // Visual parameters
+                    const scale = Math.max(0.7, 1 - Math.abs(dist) * 0.15);
+                    const opacity = Math.max(0.2, 1 - Math.abs(dist) * 0.4);
+                    const blur = Math.min(10, Math.abs(dist) * 5);
+                    const yOffset = dist * spacing;
+                    const zIndex = 100 - Math.round(Math.abs(dist) * 10);
+
+                    // Apply styles
+                    item.style.transform = `translate(-50%, calc(-50% + ${yOffset}px)) scale(${scale})`;
+                    item.style.opacity = opacity;
+                    item.style.filter = `blur(${blur}px)`;
+                    item.style.zIndex = zIndex;
+
+                    // Interaction state
+                    // Only centered item (dist < 0.5) is interactive?
+                    // Or manage pointer-events
+                    if (Math.abs(dist) < 0.5) {
+                        item.style.pointerEvents = 'auto';
+                        item.classList.add('active-card');
+                    } else {
+                        item.style.pointerEvents = 'none'; // Prevent clicking non-centered items (optional)
+                        item.classList.remove('active-card');
                     }
                 });
-                ticking = false;
+
+                rafId = requestAnimationFrame(update);
             };
 
-            list.addEventListener('scroll', () => {
-                if (!ticking) {
-                    window.requestAnimationFrame(updateList);
-                    ticking = true;
-                }
+            // Start Loop
+            update();
+
+            // Event Listeners
+            // Touch
+            container.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                startY = e.touches[0].clientY;
+                lastY = startY;
+                velocity = 0;
+                // e.preventDefault(); // Stop page scroll?
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault(); // Take control of scroll
+                const y = e.touches[0].clientY;
+                const delta = y - lastY;
+                lastY = y;
+
+                // Move scrollY based on pixels. 
+                // Sensitivity: 1 pixel move = how much index move?
+                // dragging 100px should move 1 index approx?
+                scrollY -= delta / spacing;
+            }, { passive: false });
+
+            container.addEventListener('touchend', (e) => {
+                isDragging = false;
+                // Add velocity throw
+                const now = Date.now();
+                // Simple release, physics loop handles inertia friction
             });
 
-            // Also trigger on resize
-            window.addEventListener('resize', updateList);
+            // Mouse Wheel
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                // Wheel delta usually 100 per tick
+                scrollY += e.deltaY * 0.005;
+            }, { passive: false });
 
-            // Expose for external calls (e.g. returning to menu)
-            app.updateListPositions = updateList;
-
-            // Initial call
-            setTimeout(updateList, 100);
+            // Expose for external updates (screen switch reset)
+            app.updateCarousel = () => {
+                // Determine which game is selected? Or just reset?
+                // Maybe keep last position?
+                // For now, no-op or re-clamp
+            };
         },
 
 
@@ -1339,9 +1386,9 @@
                 case 'menu':
                     app.updateUI();
                     app.switchScreen('screen-menu');
-                    if (app.updateListPositions) {
+                    if (app.updateCarousel) {
                         // Force update after layout (give a small tick for display block to apply)
-                        setTimeout(app.updateListPositions, 50);
+                        setTimeout(app.updateCarousel, 50);
                     }
                     break;
                 case 'starfall':
