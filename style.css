@@ -127,7 +127,7 @@ body::before {
     }
 
     to {
-        transform: rotate(4deg);
+        transform: rotate(2deg);
     }
 }
 
@@ -137,7 +137,7 @@ body::before {
     }
 
     to {
-        transform: scaleX(-1) rotate(4deg);
+        transform: scaleX(-1) rotate(2deg);
     }
 }
 
@@ -1877,54 +1877,10 @@ body::before {
 }
 
 /* --- Mobile Optimization --- */
-@media (max-width: 768px) {
-
-    .game-card,
-    .btn-glass-action,
-    .balance-container,
-    .card-status {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: rgba(20, 25, 40, 0.95) !important;
-        /* Solid fallback */
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
-    }
-
-    .snowflake {
-        box-shadow: none !important;
-        filter: none !important;
-    }
-
-    /* Reduce expensive animations */
-    * {
-        animation-duration: 0.01ms !important;
-        transition-duration: 0.01ms !important;
-    }
-
-    /* Re-enable critical animations */
-    .snowflake {
-        animation-duration: initial !important;
-    }
-
-    .roulette-track {
-        transition-duration: initial !important;
-    }
-
-    .game-card {
-        transition-duration: initial !important;
-    }
-
-    .ded-img {
-        animation: none !important;
-    }
-
-    /* Stop heavy breathing on mobile */
-
-    /* Fix scrolling: remove 3D perspective to save GPU */
-    .games-grid {
-        perspective: none;
-    }
-}
+/* Fix scrolling: remove 3D perspective to save GPU - DISABLED per user request for visuals */
+/* .games-grid {
+    perspective: none;
+} */
 
 /* --- Sound Controls --- */
 .sound-controls {
@@ -1946,7 +1902,8 @@ body::before {
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
     box-shadow: 0 0 15px rgba(255, 215, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.2);
     transition: all 0.3s ease;
 }
