@@ -8,6 +8,83 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;800&family=Pacifico&display=swap"
         rel="stylesheet">
+    <style>
+        /* Optimization: Reduce paint area for heavy animations */
+        .game-card {
+            will-change: transform, opacity;
+        }
+
+        /* Mobile Optimization for blur */
+        @media (max-width: 768px) {
+            .game-card {
+                filter: none !important;
+                /* Disable blur on mobile for perf */
+            }
+        }
+
+        /* Loading Screen Animations */
+        @keyframes fadeInCenter {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes moveUpTitle {
+            from {
+                transform: translateY(0) scale(1);
+            }
+
+            to {
+                transform: translateY(-100px) scale(0.8);
+            }
+        }
+
+        @keyframes santaPop {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.8);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .title-enter {
+            animation: fadeInCenter 1s ease-out forwards;
+        }
+
+        .title-move-up {
+            animation: moveUpTitle 1s ease-in-out forwards;
+        }
+
+        .santa-enter {
+            opacity: 0;
+            /* Initially hidden */
+            animation: santaPop 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Gradient Text for Timers */
+        .text-gradient-red {
+            background: linear-gradient(to bottom, #ff9a9e, #ff0000);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        .text-gradient-normal {
+            background: linear-gradient(to bottom, #fff, #ddd);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
 </head>
 
 <body>
@@ -57,7 +134,7 @@
             <div class="game-card" id="card-starfall">
                 <div class="card-level-badge">Lvl <span id="menu-starfall-level">1</span></div>
                 <div class="card-image">
-                    <img src="star.png" alt="Звездопад">
+                    <img src="star.png" alt="Звездопад" loading="lazy">
                 </div>
                 <div class="card-info">
                     <h3>Звездопад</h3>
@@ -72,7 +149,7 @@
             <!-- Game 2: Roulette -->
             <div class="game-card roulette-card" id="card-roulette">
                 <div class="card-image">
-                    <img src="cas.jpg" alt="Рулетка" onerror="this.src='star.png'">
+                    <img src="cas.jpg" alt="Рулетка" onerror="this.src='star.png'" loading="lazy">
                 </div>
                 <div class="card-info">
                     <h3>Рулетка</h3>
@@ -87,7 +164,7 @@
             <div class="game-card" id="card-cups">
                 <div class="card-level-badge">Lvl <span id="menu-cups-level">1</span></div>
                 <div class="card-image">
-                    <img src="ygadai.png" alt="Угадай" onerror="this.src='sk1.png'">
+                    <img src="ygadai.png" alt="Угадай" onerror="this.src='sk1.png'" loading="lazy">
                 </div>
                 <div class="card-info">
                     <h3>Угадай Стаканчик</h3>
@@ -105,7 +182,7 @@
             <!-- Shop (Placeholder) -->
             <div class="game-card locked">
                 <div class="card-image grayscale">
-                    <img src="ava2.png" alt="Магазин">
+                    <img src="ava2.png" alt="Магазин" loading="lazy">
                 </div>
                 <div class="card-info">
                     <h3>Магазин</h3>

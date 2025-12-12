@@ -69,8 +69,11 @@
                 { id: 'spin', name: 'Доп. Прокрут', type: 'extra_spin', val: 1, weight: 100, img: 'perekrut.png', sell: 50 },
                 { id: 'kaka', name: 'Какашка', type: 'junk', val: 0, weight: 300, img: 'kaka.png', sell: 0 },
                 { id: 'boost', name: 'Супер-Усиление', type: 'buff', val: 1, weight: 50, img: 'star.png', sell: 200 },
-                { id: 'cookie1', name: '1 Снежинка', type: 'currency', val: 1, weight: 80, img: 'zima.png', sell: 0 }, // Changed from Cookie
+                { id: 'cookie1', name: '1 Снежинка', type: 'currency', val: 1, weight: 80, img: 'zima.png', sell: 0 },
                 { id: 'tg25', name: '25 TG Stars', type: 'special', val: 25, weight: 5, img: 'star.png', sell: 1000 },
+                { id: 'tg15', name: '15 TG Stars', type: 'special', val: 15, weight: 10, img: 'star.png', sell: 600 },
+                { id: 'tg5', name: '5 TG Stars', type: 'special', val: 5, weight: 20, img: 'star.png', sell: 200 },
+                { id: 'tg1', name: '1 TG Stars', type: 'special', val: 1, weight: 40, img: 'star.png', sell: 40 },
                 { id: 'cup_hint', name: 'Подсказка в стаканчиках', type: 'buff_cup_hint', val: 1, weight: 1, img: 'pods.png', sell: 300 },
                 // Random fillers
                 { id: 'snow_rnd', name: 'Случайные Снежинки', type: 'currency', val: 0, weight: 20, img: 'zima.png', sell: 0 }
@@ -316,6 +319,7 @@
                 // Buff mode: 3 mins, max 500 stars, easier
                 starfallGame.timeLeft = 180;
                 starfallGame.targetScore = 500;
+                document.getElementById('game-level').innerText = "Супер-У"; // Label change
             } else {
                 starfallGame.timeLeft = CONFIG.starfall.duration;
                 // Difficulty increase:
@@ -331,6 +335,7 @@
                 if (level >= 6) target += (level - 5) * 10;
 
                 starfallGame.targetScore = target;
+                document.getElementById('game-level').innerText = level;
             }
 
             starfallGame.score = 0;
@@ -383,7 +388,18 @@
             const timerInt = setInterval(() => {
                 if (!starfallGame.isActive) { clearInterval(timerInt); return; }
                 starfallGame.timeLeft--;
-                document.getElementById('game-time').innerText = starfallGame.timeLeft;
+                const timeEl = document.getElementById('game-time');
+                timeEl.innerText = starfallGame.timeLeft;
+
+                // Gradient effect
+                if (starfallGame.timeLeft <= 10) {
+                    timeEl.classList.remove('text-gradient-normal');
+                    timeEl.classList.add('text-gradient-red');
+                } else {
+                    timeEl.classList.add('text-gradient-normal');
+                    timeEl.classList.remove('text-gradient-red');
+                }
+
                 if (starfallGame.timeLeft <= 0) {
                     starfallGame.end(false);
                     clearInterval(timerInt);
@@ -507,9 +523,14 @@
         end: (win) => {
             starfallGame.isActive = false;
             isGameRunning = false;
+
+            // Handle buff reward logic before clearing logic
+            // Actually finishGame handles logic, but needs to know if buff was active
+            const wasBuff = STATE.games.starfall.buff;
+
             // Clear buff if used
             if (STATE.games.starfall.buff) STATE.games.starfall.buff = false;
-            app.finishGame('starfall', starfallGame.score, win);
+            app.finishGame('starfall', starfallGame.score, win, wasBuff);
         }
     };
 
@@ -913,7 +934,17 @@
 
             cupsGame.timerInterval = setInterval(() => {
                 cupsGame.timeLeft--;
-                if (timerEl) timerEl.innerText = cupsGame.timeLeft;
+                if (timerEl) {
+                    timerEl.innerText = cupsGame.timeLeft;
+                    // Gradient effect
+                    if (cupsGame.timeLeft <= 10) {
+                        timerEl.classList.remove('text-gradient-normal');
+                        timerEl.classList.add('text-gradient-red');
+                    } else {
+                        timerEl.classList.add('text-gradient-normal');
+                        timerEl.classList.remove('text-gradient-red');
+                    }
+                }
 
                 if (cupsGame.timeLeft <= 0) {
                     cupsGame.stopTimer();
@@ -1100,6 +1131,42 @@
 
         },
 
+        playIntro: () => {
+            const title = document.querySelector('.main-title');
+            const santa = document.querySelector('.ded-img');
+            const bubble = document.querySelector('.speech-bubble');
+            const btn = document.getElementById('btn-start-adventure');
+
+            // Reset state
+            title.classList.remove('title-enter', 'title-move-up');
+            santa.classList.remove('bounce-in', 'santa-enter');
+            santa.style.opacity = '0';
+            btn.style.opacity = '0';
+            bubble.style.opacity = '0';
+
+            // Sequence
+            // 1. Title appears in center
+            title.classList.add('title-enter');
+
+            // 2. Title moves up after 1.5s
+            setTimeout(() => {
+                title.classList.add('title-move-up');
+
+                // 3. Santa appears
+                setTimeout(() => {
+                    santa.classList.add('santa-enter');
+
+                    // 4. Bubble and Button
+                    setTimeout(() => {
+                        bubble.style.transition = 'opacity 0.5s';
+                        bubble.style.opacity = '1';
+                        btn.style.transition = 'opacity 0.5s';
+                        btn.style.opacity = '1';
+                    }, 800);
+                }, 500);
+            }, 1500);
+        },
+
         initCarousel: () => {
             const container = document.querySelector('.games-grid');
             if (!container) return;
@@ -1142,13 +1209,15 @@
                     // Clamp velocity if OOB?
 
                     if (scrollY < -0.2) {
-                        // Strong pull back
-                        scrollY += (-0.0 - scrollY) * 0.2;
-                        velocity *= 0.5;
+                        // Smooth bounce back
+                        const force = (-0.0 - scrollY) * 0.1;
+                        velocity += force;
+                        velocity *= 0.8;
                     }
                     if (scrollY > maxIndex + 0.2) {
-                        scrollY += (maxIndex + 0.0 - scrollY) * 0.2;
-                        velocity *= 0.5;
+                        const force = (maxIndex + 0.0 - scrollY) * 0.1;
+                        velocity += force;
+                        velocity *= 0.8;
                     }
                 }
 
@@ -1223,7 +1292,10 @@
                 // Momentum scrolling: Add to velocity instead of direct scrollY
                 // e.deltaY is usually 100 per tick. We want 1 tick = decent push.
                 // Invert for natural feel? No, wheel down (pos) = scroll down (increase index).
-                velocity += e.deltaY * 0.001;
+
+                // OPTIMIZATION: Clamp velocity addition to prevent massive jumps on fast scroll
+                const delta = Math.max(-100, Math.min(100, e.deltaY));
+                velocity += delta * 0.001;
 
                 // Wake up loop if needed (it runs always currently)
             }, { passive: false });
@@ -1262,7 +1334,15 @@
             document.getElementById('btn-result-menu').addEventListener('click', () => { window.location.hash = 'menu'; });
 
             document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
+            document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
             document.getElementById('btn-roulette-back').addEventListener('click', () => { window.location.hash = 'menu'; });
+
+            // New: Making the whole roulette card click open the game
+            document.getElementById('card-roulette').addEventListener('click', (e) => {
+                // If clicking button inside, don't double trigger
+                if (e.target.closest('#timer-roulette') || e.target.closest('.card-actions')) return;
+                window.location.hash = 'roulette';
+            });
 
 
 
@@ -1363,7 +1443,8 @@
             const hash = window.location.hash.replace('#', '');
 
             // Anti-Cheat / Clean up
-            if (app.resultInterval) { clearInterval(app.resultInterval); app.resultInterval = null; }
+            // Fix: Only clear result interval if we are leaving the result screen
+            if (hash !== 'result' && app.resultInterval) { clearInterval(app.resultInterval); app.resultInterval = null; }
 
             // Check for mid-game exit
             if (hash !== 'starfall' && starfallGame.isActive) {
@@ -1398,6 +1479,7 @@
                 case 'loading':
                 case '':
                     app.switchScreen('screen-loading');
+                    app.playIntro(); // Trigger animation
                     break;
                 case 'menu':
                     app.updateUI();
@@ -1532,10 +1614,10 @@
                 const h = Math.floor(rouRem / 3600000);
                 const m = Math.floor((rouRem % 3600000) / 60000);
                 const s = Math.floor((rouRem % 60000) / 1000);
-                rouTimer.innerHTML = `До следующей крутки:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                rouTimer.innerHTML = `До следующей крутки:<br><span style="display:block; text-align:center;">${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}</span>`; // Centered second line
 
                 // Update Menu Button too
-                document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}`;
+                document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
             } else {
                 rouBtn.style.display = 'inline-block';
                 rouTimer.style.display = 'none';
@@ -1600,7 +1682,7 @@
 
                         // Update Menu Button
                         const el = document.getElementById('timer-roulette');
-                        if (el) el.innerText = `${h}:${m < 10 ? '0' : ''}${m}`;
+                        if (el) el.innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
                     } else {
                         // Check if we need to show button
                         const btn = document.getElementById('btn-spin');
@@ -1636,7 +1718,14 @@
 
             if (win) {
                 const level = STATE.games[gameId].level;
-                const reward = CONFIG[gameId].baseReward + (level - 1) * CONFIG[gameId].levelRewardStep;
+                // Reward Logic
+                let reward = CONFIG[gameId].baseReward + (level - 1) * CONFIG[gameId].levelRewardStep;
+
+                // Super Powerup Override
+                if (gameId === 'starfall' && arguments[3] === true) { // arguments[3] is wasBuff
+                    reward = 500;
+                }
+
                 SecureStore.addBalance(reward);
                 STATE.games[gameId].lastPlayed = Date.now();
 
@@ -1769,6 +1858,9 @@
             modalTitle.innerText = titleText;
 
             // Premium HTML Structure
+            let desc = reward.type === 'junk' ? 'Ничего, повезет в любви!' : 'Отличный улов!';
+            if (reward.id === 'boost') desc = "В игре 'Звездопад' вы будете получать 500 снежинок за победу!";
+
             display.innerHTML = `
                 <div class="prize-glow-container">
                     <div class="prize-rays"></div>
@@ -1777,7 +1869,7 @@
                     <div class="prize-sparkles"></div>
                 </div>
                 <h3 class="premium-reward-name">${reward.name}</h3>
-                <p class="premium-reward-desc">${reward.type === 'junk' ? 'Ничего, повезет в любви!' : 'Отличный улов!'}</p>
+                <p class="premium-reward-desc">${desc}</p>
             `;
 
             if (reward.sell > 0) {
