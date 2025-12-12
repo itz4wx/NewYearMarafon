@@ -1878,15 +1878,20 @@ body::before {
 
 /* --- Mobile Optimization --- */
 @media (max-width: 768px) {
-    .game-card, .btn-glass-action, .balance-container, .card-status {
+
+    .game-card,
+    .btn-glass-action,
+    .balance-container,
+    .card-status {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-        background: rgba(20, 25, 40, 0.95) !important; /* Solid fallback */
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+        background: rgba(20, 25, 40, 0.95) !important;
+        /* Solid fallback */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
     }
 
     .snowflake {
-        box-shadow: none !important; 
+        box-shadow: none !important;
         filter: none !important;
     }
 
@@ -1895,15 +1900,71 @@ body::before {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
-    
+
     /* Re-enable critical animations */
-    .snowflake { animation-duration: initial !important; }
-    .roulette-track { transition-duration: initial !important; }
-    .game-card { transition-duration: initial !important; } 
-    .ded-img { animation: none !important; } /* Stop heavy breathing on mobile */
+    .snowflake {
+        animation-duration: initial !important;
+    }
+
+    .roulette-track {
+        transition-duration: initial !important;
+    }
+
+    .game-card {
+        transition-duration: initial !important;
+    }
+
+    .ded-img {
+        animation: none !important;
+    }
+
+    /* Stop heavy breathing on mobile */
 
     /* Fix scrolling: remove 3D perspective to save GPU */
     .games-grid {
         perspective: none;
     }
+}
+
+/* --- Sound Controls --- */
+.sound-controls {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5));
+}
+
+.btn-sound {
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.btn-sound img {
+    width: 60%;
+    height: 60%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8));
+    pointer-events: none;
+}
+
+.btn-sound:hover {
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+}
+
+.btn-sound:active {
+    transform: scale(0.95);
 }

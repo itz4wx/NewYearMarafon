@@ -63,11 +63,12 @@
             cooldown: 24 * 60 * 60 * 1000,
             spinDuration: 6000,
             rewards: [
-                { id: 'snow10', name: '10 Снежинок', type: 'currency', val: 10, weight: 400, img: 'zima.png', sell: 0 },
+                { id: 'snow10', name: '10 Снежинок', type: 'currency', val: 10, weight: 450, img: 'zima.png', sell: 0 },
                 { id: 'snow500', name: '500 Снежинок', type: 'currency', val: 500, weight: 50, img: 'zima.png', sell: 0 },
                 { id: 'snow1000', name: '1000 Снежинок', type: 'currency', val: 1000, weight: 10, img: 'zima.png', sell: 0 },
                 { id: 'spin', name: 'Доп. Прокрут', type: 'extra_spin', val: 1, weight: 100, img: 'perekrut.png', sell: 50 },
-                { id: 'elka', name: 'Обломок ели', type: 'junk', val: 0, weight: 300, img: 'elka.png', sell: 0 },
+                // Removed 'elka' (poop/junk) as requested. Replaced with more common snowflakes.
+                { id: 'snow_common', name: 'Снежинка', type: 'currency', val: 5, weight: 300, img: 'zima.png', sell: 0 },
                 { id: 'boost', name: 'Супер-Усиление', type: 'buff', val: 1, weight: 50, img: 'star.png', sell: 200 },
                 { id: 'cookie1', name: '1 Снежинка', type: 'currency', val: 1, weight: 80, img: 'zima.png', sell: 0 },
                 { id: 'tg25', name: '25 TG Stars', type: 'special', val: 25, weight: 5, img: 'star.png', sell: 1000 },
@@ -170,9 +171,19 @@
         userInteracted: false,
 
         init: () => {
-            // Force sound ON. Ignore text execution or saved state.
-            soundManager.isMuted = false;
-            localStorage.setItem('isMuted', 'false');
+            // Load saved state
+            const savedMute = localStorage.getItem('isMuted');
+            soundManager.isMuted = savedMute === 'true';
+            soundManager.updateIcon();
+
+            // Bind Button
+            const btn = document.getElementById('btn-sound-toggle');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    soundManager.toggleMute();
+                });
+            }
 
             // Click Sound Setup
             const handleInteraction = () => {
@@ -198,11 +209,28 @@
             // Always play
             const audio = new Audio('knopka.mp3');
             audio.volume = 0.5;
-            audio.play().catch(() => { });
+            if (!soundManager.isMuted) audio.play().catch(() => { });
         },
 
-        // Toggle mute removed.
-        // updateMuteIcon removed.
+        toggleMute: () => {
+            soundManager.isMuted = !soundManager.isMuted;
+            localStorage.setItem('isMuted', soundManager.isMuted);
+            soundManager.updateIcon();
+
+            if (soundManager.isMuted) {
+                if (soundManager.bgm) soundManager.bgm.pause();
+            } else {
+                if (soundManager.userInteracted) soundManager.playPlaylist();
+            }
+        },
+
+        updateIcon: () => {
+            const icon = document.getElementById('sound-icon');
+            if (icon) {
+                // zz1 = ON, zz2 = OFF
+                icon.src = soundManager.isMuted ? 'zz2.png' : 'zz1.png';
+            }
+        },
 
         playPlaylist: () => {
             // Always play if not already playing
@@ -620,14 +648,15 @@
         },
 
         startIdleSpin: () => {
-            if (rouletteGame.idleInterval) clearInterval(rouletteGame.idleInterval);
-            rouletteGame.idleInterval = setInterval(() => {
+            if (rouletteGame.idleRequestId) cancelAnimationFrame(rouletteGame.idleRequestId);
+
+            const animate = () => {
                 if (rouletteGame.isSpinning) return;
                 const track = document.getElementById('roulette-track');
                 if (!track) return;
 
                 // Slow scroll
-                rouletteGame.idleOffset += 0.5; // pixels per tick
+                rouletteGame.idleOffset += 0.5; // pixels per frame (approx 30px/sec at 60fps)
                 track.style.transform = `translateX(-${rouletteGame.idleOffset}px)`;
 
                 // Reset to avoid running out
@@ -635,11 +664,14 @@
                 if (rouletteGame.idleOffset > maxOffset) {
                     rouletteGame.idleOffset = 20 * (window.innerWidth <= 480 ? 100 : 110); // Reset to start
                 }
-            }, 20); // 50fps
+
+                rouletteGame.idleRequestId = requestAnimationFrame(animate);
+            };
+            rouletteGame.idleRequestId = requestAnimationFrame(animate);
         },
 
         stopIdleSpin: () => {
-            if (rouletteGame.idleInterval) clearInterval(rouletteGame.idleInterval);
+            if (rouletteGame.idleRequestId) cancelAnimationFrame(rouletteGame.idleRequestId);
         },
 
         spin: () => {
