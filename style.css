@@ -1875,3 +1875,35 @@ body::before {
     background: rgba(0, 0, 0, 0.85);
     /* Darker dim */
 }
+
+/* --- Mobile Optimization --- */
+@media (max-width: 768px) {
+    .game-card, .btn-glass-action, .balance-container, .card-status {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        background: rgba(20, 25, 40, 0.95) !important; /* Solid fallback */
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3) !important;
+    }
+
+    .snowflake {
+        box-shadow: none !important; 
+        filter: none !important;
+    }
+
+    /* Reduce expensive animations */
+    * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    /* Re-enable critical animations */
+    .snowflake { animation-duration: initial !important; }
+    .roulette-track { transition-duration: initial !important; }
+    .game-card { transition-duration: initial !important; } 
+    .ded-img { animation: none !important; } /* Stop heavy breathing on mobile */
+
+    /* Fix scrolling: remove 3D perspective to save GPU */
+    .games-grid {
+        perspective: none;
+    }
+}

@@ -67,7 +67,7 @@
                 { id: 'snow500', name: '500 Снежинок', type: 'currency', val: 500, weight: 50, img: 'zima.png', sell: 0 },
                 { id: 'snow1000', name: '1000 Снежинок', type: 'currency', val: 1000, weight: 10, img: 'zima.png', sell: 0 },
                 { id: 'spin', name: 'Доп. Прокрут', type: 'extra_spin', val: 1, weight: 100, img: 'perekrut.png', sell: 50 },
-                { id: 'kaka', name: 'Какашка', type: 'junk', val: 0, weight: 300, img: 'kaka.png', sell: 0 },
+                { id: 'elka', name: 'Обломок ели', type: 'junk', val: 0, weight: 300, img: 'elka.png', sell: 0 },
                 { id: 'boost', name: 'Супер-Усиление', type: 'buff', val: 1, weight: 50, img: 'star.png', sell: 200 },
                 { id: 'cookie1', name: '1 Снежинка', type: 'currency', val: 1, weight: 80, img: 'zima.png', sell: 0 },
                 { id: 'tg25', name: '25 TG Stars', type: 'special', val: 25, weight: 5, img: 'star.png', sell: 1000 },
@@ -322,6 +322,9 @@
                 document.getElementById('game-level').innerText = "Супер-У"; // Label change
             } else {
                 starfallGame.timeLeft = CONFIG.starfall.duration;
+                // Level 7+ bonus time
+                if (level >= 7) starfallGame.timeLeft += 5;
+
                 // Difficulty increase:
                 // Lvl 1-3: +2 per level
                 // Lvl 4: +5 (59)
@@ -449,7 +452,9 @@
             // Simplified: dt is in seconds. 
             const isBuff = STATE.games.starfall.buff;
             // Base spawn increase + scaling
-            let spawnRate = 4 + (STATE.games.starfall.level * 0.5); // Spawns per second (Increased from 3 + 0.2)
+            let spawnRate = 4 + (STATE.games.starfall.level * 0.5); // Spawns per second
+            if (STATE.games.starfall.level >= 5) spawnRate += 2; // Extra spawn rate for level 5+
+
             if (isBuff) spawnRate = 8;
 
             // Random check adjusted for dt
@@ -1125,6 +1130,7 @@
             }
 
             // Preload Images
+            app.preloadAssets();
             const preloadLose = new Image(); preloadLose.src = 'dedlose.png';
             const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
 
@@ -1228,7 +1234,9 @@
                     // Visual parameters
                     const scale = Math.max(0.7, 1 - Math.abs(dist) * 0.15);
                     const opacity = Math.max(0.2, 1 - Math.abs(dist) * 0.4);
-                    const blur = Math.min(10, Math.abs(dist) * 5);
+                    // Optimization: Disable blur on mobile or if performance is low
+                    const isMobile = window.innerWidth < 768;
+                    const blur = isMobile ? 0 : Math.min(10, Math.abs(dist) * 5);
                     const yOffset = dist * spacing;
                     const zIndex = 100 - Math.round(Math.abs(dist) * 10);
 
@@ -1289,13 +1297,20 @@
             // Mouse Wheel
             container.addEventListener('wheel', (e) => {
                 e.preventDefault();
-                // Momentum scrolling: Add to velocity instead of direct scrollY
-                // e.deltaY is usually 100 per tick. We want 1 tick = decent push.
-                // Invert for natural feel? No, wheel down (pos) = scroll down (increase index).
+                // OPTIMIZATION: Fix PC scroll sensitivity
+                // Clamp delta much harder so 1 notch isn't multiple items
+                let d = e.deltaY;
+                if (Math.abs(d) < 5) return; // Ignore microjitters
 
-                // OPTIMIZATION: Clamp velocity addition to prevent massive jumps on fast scroll
-                const delta = Math.max(-100, Math.min(100, e.deltaY));
-                velocity += delta * 0.001;
+                // Normalize scroll direction
+                const sign = Math.sign(d);
+
+                // Add a small constant amount per wheel tick instead of using raw delta
+                // This prevents "jumping" 2-3 items
+                velocity += sign * 0.05;
+
+                // Clamp total velocity to prevent runaway scrolling
+                velocity = Math.max(-0.2, Math.min(0.2, velocity));
 
                 // Wake up loop if needed (it runs always currently)
             }, { passive: false });
@@ -1614,7 +1629,7 @@
                 const h = Math.floor(rouRem / 3600000);
                 const m = Math.floor((rouRem % 3600000) / 60000);
                 const s = Math.floor((rouRem % 60000) / 1000);
-                rouTimer.innerHTML = `До следующей крутки:<br><span style="display:block; text-align:center;">${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}</span>`; // Centered second line
+                rouTimer.innerHTML = `До следующей крутки:<br><span style="display:block; text-align:center; font-size: 1.2rem; margin-top: 5px;">${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}</span>`; // Centered second line
 
                 // Update Menu Button too
                 document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
@@ -1901,6 +1916,18 @@
                 app.saveState();
                 app.closeRouletteModal();
             }
+        },
+
+        preloadAssets: () => {
+            const assets = [
+                'zima.png', 'elka.png', 'kaka.png', 'star.png', 'perekrut.png',
+                'dedpobeda.png', 'dedlose.png', 'dedprivet.png',
+                'muz1.mp3', 'muz2.mp3', 'knopka.mp3'
+            ];
+            assets.forEach(src => {
+                const img = new Image();
+                img.src = src;
+            });
         },
 
         closeRouletteModal: () => {
