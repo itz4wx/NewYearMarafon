@@ -227,8 +227,8 @@
         updateIcon: () => {
             const icon = document.getElementById('sound-icon');
             if (icon) {
-                // zz1 = ON, zz2 = OFF
-                icon.src = soundManager.isMuted ? 'zz2.png' : 'zz1.png';
+                // zv = ON, zkk = OFF
+                icon.src = soundManager.isMuted ? 'zkk.png' : 'zv.png';
             }
         },
 
