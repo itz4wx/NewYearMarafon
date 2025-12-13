@@ -67,7 +67,7 @@
                 { id: 'snow500', name: '500 Снежинок', type: 'currency', val: 500, weight: 50, img: 'zima.png', sell: 0 },
                 { id: 'snow1000', name: '1000 Снежинок', type: 'currency', val: 1000, weight: 10, img: 'zima.png', sell: 0 },
                 { id: 'spin', name: 'Доп. Прокрут', type: 'extra_spin', val: 1, weight: 100, img: 'perekrut.png', sell: 50 },
-                { id: 'elka', name: 'Ветви ели', type: 'junk', val: 0, weight: 300, img: 'elka.png', sell: 0 },
+                { id: 'elka', name: 'Ветви ели', type: 'junk', val: 0, weight: 800, img: 'elka.png', sell: 0 },
                 { id: 'snow_common', name: 'Снежинка', type: 'currency', val: 5, weight: 100, img: 'zima.png', sell: 0 },
                 { id: 'boost', name: 'Супер-Усиление', type: 'buff', val: 1, weight: 50, img: 'star.png', sell: 200 },
                 { id: 'cookie1', name: '1 Снежинка', type: 'currency', val: 1, weight: 80, img: 'zima.png', sell: 0 },
@@ -119,6 +119,9 @@
             addBalance: (amount) => {
                 if (!validate()) return 0;
                 _balance += amount;
+                if (amount > 0) {
+                    STATE.totalSnowflakes = (STATE.totalSnowflakes || 0) + amount;
+                }
                 updateChecksum();
                 return _balance;
             },
@@ -126,7 +129,12 @@
                 _balance = amount;
                 updateChecksum();
             },
-            // Helper for save/load
+            // Total Accumulated for Ranking
+            addTotal: (amount) => {
+                if (amount <= 0) return;
+                // We keep total in STATE mostly, but can verify here if needed.
+                // Simplified: just update state directly in addBalance wrapper
+            },
             serialize: () => _balance,
         };
     })();
@@ -134,950 +142,928 @@
     const STATE = {
         // balance removed, use SecureStore
         cookies: 0,
+        totalSnowflakes: 0, // New: Lifetime accumulated
         inventory: [],
         games: {
-            lastPlayed: 0,
-            level: 1,
-            buff: false // Super boost active?
+            starfall: {
+                lastPlayed: 0,
+                level: 1,
+                buff: false // Super boost active?
+            },
+            cups: {
+                _lp: 0,
+                level: 1,
+                hints: 0,
+                hintActive: false
+            },
+            roulette: {
+                _lp: 0,
+                _nfs: 0,
+                _es: 0
+            }
         },
-        cups: {
-            _lp: 0,
-            level: 1,
-            hints: 0,
-            hintActive: false
-        },
-
-        roulette: {
-            _lp: 0,
-            _nfs: 0,
-            _es: 0
-        }
-    },
         // Router state helper
         currentHash: ''
-};
+    };
 
-let sessionGameStartTime = 0;
-let isGameRunning = false;
-let lastTime = 0; // For Delta Time
+    let sessionGameStartTime = 0;
+    let isGameRunning = false;
+    let lastTime = 0; // For Delta Time
 
-// --- Sound Manager ---
-const soundManager = {
-    playlist: ['muz1.mp3', 'muz2.mp3', 'muz3.mp3', 'muz4.mp3', 'muz5.mp3', 'muz6.mp3', 'muz7.mp3'],
-    bgm: null,
-    isMuted: false,
-    recentTracks: [], // History queue to prevent repeats
-    userInteracted: false,
+    // --- Sound Manager ---
+    const soundManager = {
+        playlist: ['muz1.mp3', 'muz2.mp3', 'muz3.mp3', 'muz4.mp3', 'muz5.mp3', 'muz6.mp3', 'muz7.mp3'],
+        bgm: null,
+        isMuted: false,
+        recentTracks: [], // History queue to prevent repeats
+        userInteracted: false,
 
-    init: () => {
-        // Load saved state
-        const savedMute = localStorage.getItem('isMuted');
-        soundManager.isMuted = savedMute === 'true';
-        soundManager.updateIcon();
-
-        // Bind Button
-        const btn = document.getElementById('btn-sound-toggle');
-        if (btn) {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                soundManager.toggleMute();
-            });
-        }
-
-        // Click Sound Setup
-        const handleInteraction = () => {
-            if (!soundManager.userInteracted) {
-                soundManager.userInteracted = true;
-                soundManager.playPlaylist();
-            }
-        };
-
-        document.addEventListener('click', (e) => {
-            handleInteraction();
-            // Play click for buttons or interactables
-            const target = e.target.closest('button, .card-status, .game-card, .btn-nice, .btn-main');
-            if (target) {
-                soundManager.playClick();
-            }
-        });
-
-        document.addEventListener('touchstart', handleInteraction, { once: true });
-    },
-
-    playClick: () => {
-        // Always play
-        const audio = new Audio('knopka.mp3');
-        audio.volume = 0.5;
-        if (!soundManager.isMuted) audio.play().catch(() => { });
-    },
-
-    toggleMute: () => {
-        soundManager.isMuted = !soundManager.isMuted;
-        localStorage.setItem('isMuted', soundManager.isMuted);
-        soundManager.updateIcon();
-
-        if (soundManager.isMuted) {
-            if (soundManager.bgm) soundManager.bgm.pause();
-        } else {
-            if (soundManager.userInteracted) soundManager.playPlaylist();
-        }
-    },
-
-    updateIcon: () => {
-        const icon = document.getElementById('sound-icon');
-        if (icon) {
-            // zv = ON, zkk = OFF
-            icon.src = soundManager.isMuted ? 'zkk.png' : 'zv.png';
-        }
-    },
-
-    playPlaylist: () => {
-        // Always play if not already playing
-        if (soundManager.bgm && !soundManager.bgm.paused) return;
-
-        let nextIndex;
-        let attempts = 0;
-        // Try to find a track not in the last 3 played
-        do {
-            nextIndex = Math.floor(Math.random() * soundManager.playlist.length);
-            attempts++;
-        } while (soundManager.recentTracks.includes(nextIndex) && attempts < 20);
-
-        // Update history
-        soundManager.recentTracks.push(nextIndex);
-        if (soundManager.recentTracks.length > 3) {
-            soundManager.recentTracks.shift();
-        }
-
-        const src = soundManager.playlist[nextIndex];
-
-        if (soundManager.bgm) {
-            soundManager.bgm.pause();
-            soundManager.bgm.src = "";
-        }
-
-        soundManager.bgm = new Audio(src);
-        soundManager.bgm.volume = 0.3;
-        soundManager.bgm.play().catch(e => {
-            console.log("Autoplay blocked, waiting for interaction", e);
-        });
-
-        soundManager.bgm.onended = () => {
-            soundManager.playPlaylist(); // Next track
-        };
-    }
-};
-
-// --- Starfall Game Engine ---
-const starfallGame = {
-    canvas: null,
-    ctx: null,
-    isActive: false,
-    score: 0,
-    targetScore: 50,
-    timeLeft: 0,
-    width: 0,
-    height: 0,
-    player: { x: 0, y: 0, w: 60, h: 60, targetX: 0, targetY: 0 },
-    entities: [],
-    imgStar: new Image(),
-    imgSock: new Image(),
-    imgKaka: new Image(),
-    imgSopli: new Image(),
-    imgVirus: new Image(),
-
-    init: () => {
-        starfallGame.canvas = document.getElementById('gameCanvas');
-        starfallGame.ctx = starfallGame.canvas.getContext('2d');
-        starfallGame.imgStar.src = 'star.png';
-        starfallGame.imgSock.src = 'nosok.png';
-        starfallGame.imgKaka.src = 'kaka.png';
-        starfallGame.imgSopli.src = 'sopli.png';
-        starfallGame.imgVirus.src = 'virus.png';
-
-        const handleMove = (e) => {
-            if (starfallGame.isActive) {
-                const rect = starfallGame.canvas.getBoundingClientRect();
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                if (e.touches) e.preventDefault();
-
-                let x = clientX - rect.left - starfallGame.player.w / 2;
-                let y = clientY - rect.top - starfallGame.player.h / 2;
-
-                // Clamp
-                x = Math.max(0, Math.min(x, starfallGame.width - starfallGame.player.w));
-                y = Math.max(0, Math.min(y, starfallGame.height - starfallGame.player.h));
-
-                starfallGame.player.targetX = x;
-                starfallGame.player.targetY = y;
-            }
-        };
-        starfallGame.canvas.addEventListener('mousemove', handleMove);
-        starfallGame.canvas.addEventListener('touchmove', handleMove, { passive: false });
-        starfallGame.canvas.addEventListener('touchstart', handleMove, { passive: false });
-    },
-
-    resize: () => {
-        const container = document.getElementById('screen-game');
-        if (!container) return;
-        starfallGame.width = Math.min(container.clientWidth - 40, 500);
-        starfallGame.height = window.innerHeight * 0.7;
-        if (starfallGame.canvas) {
-            starfallGame.canvas.width = starfallGame.width;
-            starfallGame.canvas.height = starfallGame.height;
-        }
-    },
-
-    prepare: () => {
-        app.switchScreen('screen-game');
-        document.body.className = 'bg-starfall';
-        if (!starfallGame.canvas) starfallGame.init();
-
-        starfallGame.resize();
-        starfallGame.player.w = 90; // Increased from 60
-        starfallGame.player.h = 90; // Increased from 60
-
-        // Difficulty Calculation
-        const level = STATE.games.starfall.level;
-        const isBuff = STATE.games.starfall.buff;
-
-        if (isBuff) {
-            // Buff mode: 3 mins, max 500 stars, easier
-            starfallGame.timeLeft = 180;
-            starfallGame.targetScore = 500;
-            document.getElementById('game-level').innerText = "Супер-У"; // Label change
-        } else {
-            starfallGame.timeLeft = CONFIG.starfall.duration;
-            // Level 7+ bonus time
-            if (level >= 7) starfallGame.timeLeft += 5;
-
-            // Difficulty increase:
-            // Lvl 1-3: +2 per level
-            // Lvl 4: +5 (59)
-            // Lvl 5: +9 (68)
-            // Lvl 6+: +10 per level
-            let target = CONFIG.starfall.baseWinScore;
-            if (level > 1) target += Math.min(level - 1, 2) * CONFIG.starfall.winScoreStep; // Lvl 2, 3 add 2 each
-
-            if (level >= 4) target += 5;
-            if (level >= 5) target += 9;
-            if (level >= 6) target += (level - 5) * 10;
-
-            starfallGame.targetScore = target;
-            document.getElementById('game-level').innerText = level;
-        }
-
-        starfallGame.score = 0;
-        starfallGame.isActive = false;
-        starfallGame.entities = [];
-
-        starfallGame.player.x = starfallGame.width / 2 - 30;
-        starfallGame.player.y = starfallGame.height - 80;
-        starfallGame.player.targetX = starfallGame.player.x;
-        starfallGame.player.targetY = starfallGame.player.y;
-
-        document.getElementById('game-level').innerText = level;
-        document.getElementById('game-score').innerText = 0;
-        document.getElementById('game-target').innerText = starfallGame.targetScore;
-        document.getElementById('game-time').innerText = starfallGame.timeLeft;
-
-        starfallGame.draw();
-        starfallGame.startCountdown();
-    },
-
-    startCountdown: () => {
-        const countdownEl = document.getElementById('game-countdown');
-        let count = 3;
-        const showNum = (num) => {
-            countdownEl.innerText = num;
-            countdownEl.classList.remove('active');
-            void countdownEl.offsetWidth;
-            countdownEl.classList.add('active');
-        };
-        showNum(3);
-        const int = setInterval(() => {
-            count--;
-            if (count > 0) showNum(count);
-            else {
-                clearInterval(int);
-                countdownEl.innerText = '';
-                countdownEl.classList.remove('active');
-                starfallGame.start();
-            }
-        }, 1000);
-    },
-
-    start: () => {
-        starfallGame.isActive = true;
-        isGameRunning = true;
-        sessionGameStartTime = Date.now();
-        lastTime = performance.now();
-        requestAnimationFrame(starfallGame.loop);
-
-        const timerInt = setInterval(() => {
-            if (!starfallGame.isActive) { clearInterval(timerInt); return; }
-            starfallGame.timeLeft--;
-            const timeEl = document.getElementById('game-time');
-            timeEl.innerText = starfallGame.timeLeft;
-
-            // Gradient effect
-            if (starfallGame.timeLeft <= 10) {
-                timeEl.classList.remove('text-gradient-normal');
-                timeEl.classList.add('text-gradient-red');
+        init: () => {
+            // Load saved state or default to FALSE (Sound ON)
+            let savedMute = localStorage.getItem('isMuted');
+            if (savedMute === null) {
+                // Default ON
+                soundManager.isMuted = false;
             } else {
-                timeEl.classList.add('text-gradient-normal');
-                timeEl.classList.remove('text-gradient-red');
+                soundManager.isMuted = savedMute === 'true';
             }
 
-            if (starfallGame.timeLeft <= 0) {
-                starfallGame.end(false);
-                clearInterval(timerInt);
+            soundManager.updateIcon();
+
+            // Bind Button
+            const btn = document.getElementById('btn-sound-toggle');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    soundManager.toggleMute();
+                });
             }
-        }, 1000);
-    },
 
-    spawnEntity: () => {
-        const size = 35; // Reduced from 55 (and orig 30) for better playability
-        const rand = Math.random();
-        const level = STATE.games.starfall.level;
-        const isBuff = STATE.games.starfall.buff;
+            // Bind Profile Toggle
+            const profileToggle = document.getElementById('btn-sound-profile-toggle');
+            if (profileToggle) {
+                profileToggle.addEventListener('click', () => {
+                    soundManager.toggleMute();
+                });
+            }
 
-        // Dynamic Parasite Chance
-        // Base 0.2, +0.03 per level, CAP at 0.35
-        let parasiteChance = Math.min(0.35, CONFIG.starfall.baseParasiteChance + (level - 1) * 0.03);
-        if (isBuff) parasiteChance = 0.05; // Very low in buff mode
+            // Click Sound Setup
+            const handleInteraction = () => {
+                if (!soundManager.userInteracted) {
+                    soundManager.userInteracted = true;
+                    soundManager.playPlaylist();
+                }
+            };
 
-        let type = 'star';
-        if (rand < parasiteChance) {
-            const pType = Math.random();
-            if (pType < 0.33) type = 'kaka';
-            else if (pType < 0.66) type = 'sopli';
-            else type = 'virus';
-        }
+            document.addEventListener('click', (e) => {
+                handleInteraction();
+                // Play click for buttons or interactables
+                const target = e.target.closest('button, .card-status, .game-card, .btn-nice, .btn-main');
+                if (target) {
+                    soundManager.playClick();
+                }
+            });
 
-        // Speed
-        let speed = CONFIG.starfall.baseSpeed + (level - 1) * CONFIG.starfall.speedLevelFactor;
-        if (isBuff) speed *= 0.7; // Slower in buff mode
+            document.addEventListener('touchstart', handleInteraction, { once: true });
+        },
 
-        starfallGame.entities.push({
-            x: Math.random() * (starfallGame.width - size),
-            y: -size,
-            size: size,
-            type: type,
-            speed: speed
-        });
-    },
+        playClick: () => {
+            // Always play
+            const audio = new Audio('knopka.mp3');
+            audio.volume = 0.5;
+            if (!soundManager.isMuted) audio.play().catch(() => { });
+        },
 
-    update: (dt) => {
-        const lerp = 0.2; // Lerp is frame independent enough for UI smoothing usually, or can be adjusted
-        starfallGame.player.x += (starfallGame.player.targetX - starfallGame.player.x) * lerp;
-        starfallGame.player.y += (starfallGame.player.targetY - starfallGame.player.y) * lerp;
+        toggleMute: () => {
+            soundManager.isMuted = !soundManager.isMuted;
+            localStorage.setItem('isMuted', soundManager.isMuted);
+            soundManager.updateIcon();
 
-        // Spawn Rate - make independent of framerate?
-        // Currently spawn check is per frame. Ideally should be time based accumulator.
-        // Simplified: dt is in seconds. 
-        const isBuff = STATE.games.starfall.buff;
-        // Base spawn increase + scaling
-        let spawnRate = 4 + (STATE.games.starfall.level * 0.5); // Spawns per second
-        if (STATE.games.starfall.level >= 5) spawnRate += 2; // Extra spawn rate for level 5+
+            if (soundManager.isMuted) {
+                if (soundManager.bgm) soundManager.bgm.pause();
+            } else {
+                if (soundManager.userInteracted) soundManager.playPlaylist();
+            }
+        },
 
-        if (isBuff) spawnRate = 8;
+        updateIcon: () => {
+            const icon = document.getElementById('sound-icon');
+            if (icon) {
+                // zv = ON, zkk = OFF
+                icon.src = soundManager.isMuted ? 'zkk.png' : 'zv.png';
+            }
 
-        // Random check adjusted for dt
-        if (Math.random() < spawnRate * dt) starfallGame.spawnEntity();
+            // Update Profile Toggle
+            const toggle = document.getElementById('ui-sound-toggle');
+            const profileIcon = document.getElementById('profile-sound-icon');
 
-        for (let i = starfallGame.entities.length - 1; i >= 0; i--) {
-            let s = starfallGame.entities[i];
-            s.y += s.speed * dt;
-
-            const p = starfallGame.player;
-            if (s.x < p.x + p.w && s.x + s.size > p.x && s.y < p.y + p.h && s.y + s.size > p.y) {
-                starfallGame.entities.splice(i, 1);
-                if (s.type === 'star') {
-                    starfallGame.score++;
+            if (toggle) {
+                if (!soundManager.isMuted) {
+                    toggle.classList.add('active'); // ON = Active
                 } else {
-                    starfallGame.score = Math.max(0, starfallGame.score - 5);
-                    const scoreEl = document.getElementById('game-score');
-                    if (scoreEl) {
-                        scoreEl.classList.add('score-damage');
-                        setTimeout(() => scoreEl.classList.remove('score-damage'), 1000);
-                    }
+                    toggle.classList.remove('active');
                 }
-                document.getElementById('game-score').innerText = starfallGame.score;
+            }
+            if (profileIcon) {
+                profileIcon.src = soundManager.isMuted ? 'bez.png' : 'zv.png';
+            }
+        },
 
-                if (starfallGame.score >= starfallGame.targetScore) {
-                    starfallGame.end(true);
-                    return;
+        playPlaylist: () => {
+            // Always play if not already playing
+            if (soundManager.bgm && !soundManager.bgm.paused) return;
+
+            let nextIndex;
+            let attempts = 0;
+            // Try to find a track not in the last 3 played
+            do {
+                nextIndex = Math.floor(Math.random() * soundManager.playlist.length);
+                attempts++;
+            } while (soundManager.recentTracks.includes(nextIndex) && attempts < 20);
+
+            // Update history
+            soundManager.recentTracks.push(nextIndex);
+            if (soundManager.recentTracks.length > 3) {
+                soundManager.recentTracks.shift();
+            }
+
+            const src = soundManager.playlist[nextIndex];
+
+            if (soundManager.bgm) {
+                soundManager.bgm.pause();
+                soundManager.bgm.src = "";
+            }
+
+            soundManager.bgm = new Audio(src);
+            soundManager.bgm.volume = 0.3;
+            soundManager.bgm.play().catch(e => {
+                console.log("Autoplay blocked, waiting for interaction", e);
+            });
+
+            soundManager.bgm.onended = () => {
+                soundManager.playPlaylist(); // Next track
+            };
+        }
+    };
+
+    // --- Starfall Game Engine ---
+    const starfallGame = {
+        canvas: null,
+        ctx: null,
+        isActive: false,
+        score: 0,
+        targetScore: 50,
+        timeLeft: 0,
+        width: 0,
+        height: 0,
+        player: { x: 0, y: 0, w: 60, h: 60, targetX: 0, targetY: 0 },
+        entities: [],
+        imgStar: new Image(),
+        imgSock: new Image(),
+        imgKaka: new Image(),
+        imgSopli: new Image(),
+        imgVirus: new Image(),
+
+        init: () => {
+            starfallGame.canvas = document.getElementById('gameCanvas');
+            starfallGame.ctx = starfallGame.canvas.getContext('2d');
+            starfallGame.imgStar.src = 'star.png';
+            starfallGame.imgSock.src = 'nosok.png';
+            starfallGame.imgKaka.src = 'kaka.png';
+            starfallGame.imgSopli.src = 'sopli.png';
+            starfallGame.imgVirus.src = 'virus.png';
+
+            const handleMove = (e) => {
+                if (starfallGame.isActive) {
+                    const rect = starfallGame.canvas.getBoundingClientRect();
+                    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    if (e.touches) e.preventDefault();
+
+                    let x = clientX - rect.left - starfallGame.player.w / 2;
+                    let y = clientY - rect.top - starfallGame.player.h / 2;
+
+                    // Clamp
+                    x = Math.max(0, Math.min(x, starfallGame.width - starfallGame.player.w));
+                    y = Math.max(0, Math.min(y, starfallGame.height - starfallGame.player.h));
+
+                    starfallGame.player.targetX = x;
+                    starfallGame.player.targetY = y;
                 }
-            } else if (s.y > starfallGame.height) {
-                starfallGame.entities.splice(i, 1);
+            };
+            starfallGame.canvas.addEventListener('mousemove', handleMove);
+            starfallGame.canvas.addEventListener('touchmove', handleMove, { passive: false });
+            starfallGame.canvas.addEventListener('touchstart', handleMove, { passive: false });
+        },
+
+        resize: () => {
+            const container = document.getElementById('screen-game');
+            if (!container) return;
+            starfallGame.width = Math.min(container.clientWidth - 40, 500);
+            starfallGame.height = window.innerHeight * 0.7;
+            if (starfallGame.canvas) {
+                starfallGame.canvas.width = starfallGame.width;
+                starfallGame.canvas.height = starfallGame.height;
             }
-        }
-    },
+        },
 
-    draw: () => {
-        starfallGame.ctx.clearRect(0, 0, starfallGame.width, starfallGame.height);
+        prepare: () => {
+            app.switchScreen('screen-game');
+            document.body.className = 'bg-starfall';
+            if (!starfallGame.canvas) starfallGame.init();
 
-        // Only draw sock if game is active or we want to show it (not during countdown start)
-        // User requested: "Bug fix: sock appears during countdown".
-        // We only draw player if isGameRunning is true.
-        if (isGameRunning && starfallGame.imgSock.complete) {
-            starfallGame.ctx.drawImage(starfallGame.imgSock, starfallGame.player.x, starfallGame.player.y, starfallGame.player.w, starfallGame.player.h);
-        }
+            starfallGame.resize();
+            starfallGame.player.w = 90; // Increased from 60
+            starfallGame.player.h = 90; // Increased from 60
 
-        starfallGame.entities.forEach(s => {
-            let img = starfallGame.imgStar;
-            if (s.type === 'kaka') img = starfallGame.imgKaka;
-            if (s.type === 'sopli') img = starfallGame.imgSopli;
-            if (s.type === 'virus') img = starfallGame.imgVirus;
+            // Difficulty Calculation
+            const level = STATE.games.starfall.level;
+            const isBuff = STATE.games.starfall.buff;
 
-            if (img.complete) starfallGame.ctx.drawImage(img, s.x, s.y, s.size, s.size);
-            else {
-                starfallGame.ctx.fillStyle = s.type === 'star' ? '#ffd700' : '#00ff00';
-                starfallGame.ctx.beginPath();
-                starfallGame.ctx.arc(s.x + s.size / 2, s.y + s.size / 2, s.size / 2, 0, Math.PI * 2);
-                starfallGame.ctx.fill();
+            if (isBuff) {
+                // Buff mode: 3 mins, max 500 stars, easier
+                starfallGame.timeLeft = 180;
+                starfallGame.targetScore = 500;
+                document.getElementById('game-level').innerText = "Супер-У"; // Label change
+            } else {
+                starfallGame.timeLeft = CONFIG.starfall.duration;
+                // Level 7+ bonus time
+                if (level >= 7) starfallGame.timeLeft += 5;
+
+                // Difficulty increase:
+                // Lvl 1-3: +2 per level
+                // Lvl 4: +5 (59)
+                // Lvl 5: +9 (68)
+                // Lvl 6+: +10 per level
+                let target = CONFIG.starfall.baseWinScore;
+                if (level > 1) target += Math.min(level - 1, 2) * CONFIG.starfall.winScoreStep; // Lvl 2, 3 add 2 each
+
+                if (level >= 4) target += 5;
+                if (level >= 5) target += 9;
+                if (level >= 6) target += (level - 5) * 10;
+
+                starfallGame.targetScore = target;
+                document.getElementById('game-level').innerText = level;
             }
-        });
-    },
 
-    loop: (timestamp) => {
-        if (!starfallGame.isActive) return;
-        const dt = (timestamp - lastTime) / 1000;
-        lastTime = timestamp;
+            starfallGame.score = 0;
+            starfallGame.isActive = false;
+            starfallGame.entities = [];
 
-        starfallGame.update(dt);
-        starfallGame.draw();
-        requestAnimationFrame(starfallGame.loop);
-    },
+            starfallGame.player.x = starfallGame.width / 2 - 30;
+            starfallGame.player.y = starfallGame.height - 80;
+            starfallGame.player.targetX = starfallGame.player.x;
+            starfallGame.player.targetY = starfallGame.player.y;
 
-    end: (win) => {
-        starfallGame.isActive = false;
-        isGameRunning = false;
+            document.getElementById('game-level').innerText = level;
+            document.getElementById('game-score').innerText = 0;
+            document.getElementById('game-target').innerText = starfallGame.targetScore;
+            document.getElementById('game-time').innerText = starfallGame.timeLeft;
 
-        // Handle buff reward logic before clearing logic
-        // Actually finishGame handles logic, but needs to know if buff was active
-        const wasBuff = STATE.games.starfall.buff;
+            starfallGame.draw();
+            starfallGame.startCountdown();
+        },
 
-        // Clear buff if used
-        if (STATE.games.starfall.buff) STATE.games.starfall.buff = false;
-        app.finishGame('starfall', starfallGame.score, win, wasBuff);
-    }
-};
+        startCountdown: () => {
+            const countdownEl = document.getElementById('game-countdown');
+            let count = 3;
+            const showNum = (num) => {
+                countdownEl.innerText = num;
+                countdownEl.classList.remove('active');
+                void countdownEl.offsetWidth;
+                countdownEl.classList.add('active');
+            };
+            showNum(3);
+            const int = setInterval(() => {
+                count--;
+                if (count > 0) showNum(count);
+                else {
+                    clearInterval(int);
+                    countdownEl.innerText = '';
+                    countdownEl.classList.remove('active');
+                    starfallGame.start();
+                }
+            }, 1000);
+        },
 
-// --- Roulette Engine ---
-const rouletteGame = {
-    isSpinning: false,
-    items: [],
-    idleInterval: null,
-    idleOffset: 0,
+        start: () => {
+            starfallGame.isActive = true;
+            isGameRunning = true;
+            sessionGameStartTime = Date.now();
+            lastTime = performance.now();
+            requestAnimationFrame(starfallGame.loop);
 
-    init: () => {
-        const track = document.getElementById('roulette-track');
-        track.innerHTML = '';
-        // Create a long strip for scrolling
-        const rewards = CONFIG.roulette.rewards;
-        rouletteGame.items = [];
+            const timerInt = setInterval(() => {
+                if (!starfallGame.isActive) { clearInterval(timerInt); return; }
+                starfallGame.timeLeft--;
+                const timeEl = document.getElementById('game-time');
+                timeEl.innerText = starfallGame.timeLeft;
 
-        // Generate pool based on weights for random fill, but for visual track we just repeat list
-        // Create many items to simulate infinite scroll
-        let lastRareIndex = -10; // Track last rare item position
+                // Gradient effect
+                if (starfallGame.timeLeft <= 10) {
+                    timeEl.classList.remove('text-gradient-normal');
+                    timeEl.classList.add('text-gradient-red');
+                } else {
+                    timeEl.classList.add('text-gradient-normal');
+                    timeEl.classList.remove('text-gradient-red');
+                }
 
-        for (let i = 0; i < 100; i++) {
-            let r = rewards[Math.floor(Math.random() * rewards.length)];
+                if (starfallGame.timeLeft <= 0) {
+                    starfallGame.end(false);
+                    clearInterval(timerInt);
+                }
+            }, 1000);
+        },
 
-            // Check for clumping of rare items
-            const isRare = (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint' || r.type === 'special' || r.type === 'buff');
+        spawnEntity: () => {
+            const size = 35; // Reduced from 55 (and orig 30) for better playability
+            const rand = Math.random();
+            const level = STATE.games.starfall.level;
+            const isBuff = STATE.games.starfall.buff;
 
-            if (isRare) {
-                const distance = i - lastRareIndex;
-                // If too close (within 5 items), 80% chance to reroll to something common
-                if (distance < 5) {
-                    if (Math.random() < 0.8) {
-                        // Reroll to junk or small currency
-                        const common = rewards.filter(x => x.type === 'junk' || x.val <= 10);
-                        r = common[Math.floor(Math.random() * common.length)];
+            // Dynamic Parasite Chance
+            // Base 0.2, +0.03 per level, CAP at 0.35
+            let parasiteChance = Math.min(0.35, CONFIG.starfall.baseParasiteChance + (level - 1) * 0.03);
+            if (isBuff) parasiteChance = 0.05; // Very low in buff mode
+
+            let type = 'star';
+            if (rand < parasiteChance) {
+                const pType = Math.random();
+                if (pType < 0.33) type = 'kaka';
+                else if (pType < 0.66) type = 'sopli';
+                else type = 'virus';
+            }
+
+            // Speed
+            let speed = CONFIG.starfall.baseSpeed + (level - 1) * CONFIG.starfall.speedLevelFactor;
+            if (isBuff) speed *= 0.7; // Slower in buff mode
+
+            starfallGame.entities.push({
+                x: Math.random() * (starfallGame.width - size),
+                y: -size,
+                size: size,
+                type: type,
+                speed: speed
+            });
+        },
+
+        update: (dt) => {
+            const lerp = 0.2; // Lerp is frame independent enough for UI smoothing usually, or can be adjusted
+            starfallGame.player.x += (starfallGame.player.targetX - starfallGame.player.x) * lerp;
+            starfallGame.player.y += (starfallGame.player.targetY - starfallGame.player.y) * lerp;
+
+            // Spawn Rate - make independent of framerate?
+            // Currently spawn check is per frame. Ideally should be time based accumulator.
+            // Simplified: dt is in seconds. 
+            const isBuff = STATE.games.starfall.buff;
+            // Base spawn increase + scaling
+            let spawnRate = 4 + (STATE.games.starfall.level * 0.5); // Spawns per second
+            if (STATE.games.starfall.level >= 5) spawnRate += 2; // Extra spawn rate for level 5+
+
+            if (isBuff) spawnRate = 8;
+
+            // Random check adjusted for dt
+            if (Math.random() < spawnRate * dt) starfallGame.spawnEntity();
+
+            for (let i = starfallGame.entities.length - 1; i >= 0; i--) {
+                let s = starfallGame.entities[i];
+                s.y += s.speed * dt;
+
+                const p = starfallGame.player;
+                if (s.x < p.x + p.w && s.x + s.size > p.x && s.y < p.y + p.h && s.y + s.size > p.y) {
+                    starfallGame.entities.splice(i, 1);
+                    if (s.type === 'star') {
+                        starfallGame.score++;
                     } else {
-                        // Allowed to exist (20% chance)
+                        starfallGame.score = Math.max(0, starfallGame.score - 5);
+                        const scoreEl = document.getElementById('game-score');
+                        if (scoreEl) {
+                            scoreEl.classList.add('score-damage');
+                            setTimeout(() => scoreEl.classList.remove('score-damage'), 1000);
+                        }
+                    }
+                    document.getElementById('game-score').innerText = starfallGame.score;
+
+                    if (starfallGame.score >= starfallGame.targetScore) {
+                        starfallGame.end(true);
+                        return;
+                    }
+                } else if (s.y > starfallGame.height) {
+                    starfallGame.entities.splice(i, 1);
+                }
+            }
+        },
+
+        draw: () => {
+            starfallGame.ctx.clearRect(0, 0, starfallGame.width, starfallGame.height);
+
+            // Only draw sock if game is active or we want to show it (not during countdown start)
+            // User requested: "Bug fix: sock appears during countdown".
+            // We only draw player if isGameRunning is true.
+            if (isGameRunning && starfallGame.imgSock.complete) {
+                starfallGame.ctx.drawImage(starfallGame.imgSock, starfallGame.player.x, starfallGame.player.y, starfallGame.player.w, starfallGame.player.h);
+            }
+
+            starfallGame.entities.forEach(s => {
+                let img = starfallGame.imgStar;
+                if (s.type === 'kaka') img = starfallGame.imgKaka;
+                if (s.type === 'sopli') img = starfallGame.imgSopli;
+                if (s.type === 'virus') img = starfallGame.imgVirus;
+
+                if (img.complete) starfallGame.ctx.drawImage(img, s.x, s.y, s.size, s.size);
+                else {
+                    starfallGame.ctx.fillStyle = s.type === 'star' ? '#ffd700' : '#00ff00';
+                    starfallGame.ctx.beginPath();
+                    starfallGame.ctx.arc(s.x + s.size / 2, s.y + s.size / 2, s.size / 2, 0, Math.PI * 2);
+                    starfallGame.ctx.fill();
+                }
+            });
+        },
+
+        loop: (timestamp) => {
+            if (!starfallGame.isActive) return;
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            starfallGame.update(dt);
+            starfallGame.draw();
+            requestAnimationFrame(starfallGame.loop);
+        },
+
+        end: (win) => {
+            starfallGame.isActive = false;
+            isGameRunning = false;
+
+            // Handle buff reward logic before clearing logic
+            // Actually finishGame handles logic, but needs to know if buff was active
+            const wasBuff = STATE.games.starfall.buff;
+
+            // Clear buff if used
+            if (STATE.games.starfall.buff) STATE.games.starfall.buff = false;
+            app.finishGame('starfall', starfallGame.score, win, wasBuff);
+        }
+    };
+
+    // --- Roulette Engine ---
+    const rouletteGame = {
+        isSpinning: false,
+        items: [],
+        idleInterval: null,
+        idleOffset: 0,
+
+        init: () => {
+            const track = document.getElementById('roulette-track');
+            track.innerHTML = '';
+            // Create a long strip for scrolling
+            const rewards = CONFIG.roulette.rewards;
+            rouletteGame.items = [];
+
+            // Generate pool based on weights for random fill, but for visual track we just repeat list
+            // Create many items to simulate infinite scroll
+            let lastRareIndex = -10; // Track last rare item position
+
+            for (let i = 0; i < 100; i++) {
+                let r = rewards[Math.floor(Math.random() * rewards.length)];
+
+                // Check for clumping of rare items
+                const isRare = (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint' || r.type === 'special' || r.type === 'buff');
+
+                if (isRare) {
+                    const distance = i - lastRareIndex;
+                    // If too close (within 5 items), 80% chance to reroll to something common
+                    if (distance < 5) {
+                        if (Math.random() < 0.8) {
+                            // Reroll to junk or small currency
+                            const common = rewards.filter(x => x.type === 'junk' || x.val <= 10);
+                            r = common[Math.floor(Math.random() * common.length)];
+                        } else {
+                            // Allowed to exist (20% chance)
+                            lastRareIndex = i;
+                        }
+                    } else {
                         lastRareIndex = i;
                     }
-                } else {
-                    lastRareIndex = i;
                 }
-            }
-
-            rouletteGame.items.push(r);
-            const el = document.createElement('div');
-            el.className = 'roulette-item';
-
-            // Special Highlights
-            if (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint') {
-                el.classList.add('super-rare');
-                // Add gold border custom if needed, or rely on super-rare class
-            } else if (r.type === 'special' || r.type === 'buff') {
-                el.classList.add('rare');
-            }
-
-            if (r.id === 'cup_hint') {
-                el.style.border = '2px solid #ffd700';
-                el.style.boxShadow = '0 0 15px #ffd700';
-            }
-
-            // Explicitly ensure snow10 never gets borders even if logic changes elsewhere
-            if (r.id === 'snow10') {
-                el.classList.remove('rare', 'super-rare');
-                el.style.border = 'none';
-                el.style.boxShadow = 'none';
-            }
-
-            el.innerHTML = `<img src="${r.img}"><span>${r.name}</span>`;
-            track.appendChild(el);
-        }
-
-        // Start in the middle to show content on left
-        const itemWidth = window.innerWidth <= 480 ? 100 : 110;
-        const startOffset = 20 * itemWidth; // Start at item 20
-        track.style.transition = 'none';
-        track.style.transform = `translateX(-${startOffset}px)`;
-        track.dataset.currentOffset = startOffset;
-        rouletteGame.idleOffset = startOffset;
-
-        rouletteGame.startIdleSpin();
-    },
-
-    startIdleSpin: () => {
-        if (rouletteGame.idleRequestId) cancelAnimationFrame(rouletteGame.idleRequestId);
-
-        const animate = () => {
-            if (rouletteGame.isSpinning) return;
-            const track = document.getElementById('roulette-track');
-            if (!track) return;
-
-            // Slow scroll
-            rouletteGame.idleOffset += 0.5; // pixels per frame (approx 30px/sec at 60fps)
-            track.style.transform = `translateX(-${rouletteGame.idleOffset}px)`;
-
-            // Reset to avoid running out
-            const maxOffset = 80 * (window.innerWidth <= 480 ? 100 : 110);
-            if (rouletteGame.idleOffset > maxOffset) {
-                rouletteGame.idleOffset = 20 * (window.innerWidth <= 480 ? 100 : 110); // Reset to start
-            }
-
-            rouletteGame.idleRequestId = requestAnimationFrame(animate);
-        };
-        rouletteGame.idleRequestId = requestAnimationFrame(animate);
-    },
-
-    stopIdleSpin: () => {
-        if (rouletteGame.idleRequestId) cancelAnimationFrame(rouletteGame.idleRequestId);
-    },
-
-    spin: () => {
-        if (rouletteGame.isSpinning) return;
-        rouletteGame.stopIdleSpin();
-
-        // Check availability
-        const now = Date.now();
-        const canSpin = (STATE.games.roulette._es > 0) || (now >= STATE.games.roulette._nfs);
-
-        if (!canSpin) return;
-
-        if (STATE.games.roulette._es > 0) STATE.games.roulette._es--;
-        else STATE.games.roulette._nfs = now + CONFIG.roulette.cooldown;
-
-        app.saveState();
-        app.updateUI();
-
-        rouletteGame.isSpinning = true;
-        const track = document.getElementById('roulette-track');
-        const itemWidth = window.innerWidth <= 480 ? 100 : 110;
-
-        // Determine result
-        const totalWeight = CONFIG.roulette.rewards.reduce((acc, r) => acc + r.weight, 0);
-        let rnd = Math.random() * totalWeight;
-        let result = null;
-        for (let r of CONFIG.roulette.rewards) {
-            if (rnd < r.weight) { result = r; break; }
-            rnd -= r.weight;
-        }
-        if (!result) result = CONFIG.roulette.rewards[0];
-
-        // Handle random snowflake amount
-        if (result.id === 'snow_rnd') {
-            result.val = Math.floor(Math.random() * 300) + 1;
-            result.name = `${result.val} Снежинок`;
-        }
-
-        // Setup winning item in the track
-        // We spin forward by ~40 items from current position
-        const currentOffset = parseFloat(track.dataset.currentOffset || 0);
-        const currentItemIndex = Math.floor(currentOffset / itemWidth);
-        const targetIndex = currentItemIndex + 40 + Math.floor(Math.random() * 5); // Add random variation
-
-        // Fix: Dynamically append items if we are running out
-        if (targetIndex >= rouletteGame.items.length - 10) {
-            const rewards = CONFIG.roulette.rewards;
-            for (let k = 0; k < 50; k++) {
-                let r = rewards[Math.floor(Math.random() * rewards.length)];
-                // Simple reroll logic for rares to avoid clustering (simplified from init)
-                const isRare = (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost');
-                if (isRare && Math.random() < 0.7) continue;
 
                 rouletteGame.items.push(r);
                 const el = document.createElement('div');
                 el.className = 'roulette-item';
-                if (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint') el.classList.add('super-rare');
-                else if (r.type === 'special' || r.type === 'buff') el.classList.add('rare');
 
-                if (r.id === 'cup_hint') { el.style.border = '2px solid #ffd700'; el.style.boxShadow = '0 0 15px #ffd700'; }
-                if (r.id === 'snow10') { el.classList.remove('rare', 'super-rare'); el.style.border = 'none'; el.style.boxShadow = 'none'; }
+                // Special Highlights
+                if (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint') {
+                    el.classList.add('super-rare');
+                    // Add gold border custom if needed, or rely on super-rare class
+                } else if (r.type === 'special' || r.type === 'buff') {
+                    el.classList.add('rare');
+                }
+
+                if (r.id === 'cup_hint') {
+                    el.style.border = '2px solid #ffd700';
+                    el.style.boxShadow = '0 0 15px #ffd700';
+                }
+
+                // Explicitly ensure snow10 never gets borders even if logic changes elsewhere
+                if (r.id === 'snow10') {
+                    el.classList.remove('rare', 'super-rare');
+                    el.style.border = 'none';
+                    el.style.boxShadow = 'none';
+                }
 
                 el.innerHTML = `<img src="${r.img}"><span>${r.name}</span>`;
                 track.appendChild(el);
             }
-        }
 
-        // Re-query items to include new ones
-        const allItems = track.querySelectorAll('.roulette-item');
+            // Start in the middle to show content on left
+            const itemWidth = window.innerWidth <= 480 ? 100 : 110;
+            const startOffset = 20 * itemWidth; // Start at item 20
+            track.style.transition = 'none';
+            track.style.transform = `translateX(-${startOffset}px)`;
+            track.dataset.currentOffset = startOffset;
+            rouletteGame.idleOffset = startOffset;
 
-        const targetEl = allItems[targetIndex];
-        if (targetEl) {
-            targetEl.innerHTML = `<img src="${result.img}"><span>${result.name}</span>`;
-            targetEl.className = 'roulette-item'; // Reset classes
-
-            if (result.id === 'snow1000' || result.id === 'tg25' || result.id === 'boost' || result.id === 'cup_hint') {
-                targetEl.classList.add('super-rare');
-            } else if (result.type === 'special' || result.type === 'buff') {
-                targetEl.classList.add('rare');
-            }
-        }
-
-        // Animation
-        // Center the target item
-        // offset = (targetIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2)
-        const containerWidth = track.parentElement.clientWidth;
-        const targetOffset = (targetIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2);
-
-        // Start Spin
-        track.style.transition = `transform ${CONFIG.roulette.spinDuration}ms cubic-bezier(0.1, 0, 0.2, 1)`;
-        track.style.transform = `translateX(-${targetOffset}px)`;
-        track.dataset.currentOffset = targetOffset;
-
-        setTimeout(() => {
-            rouletteGame.isSpinning = false;
-            app.showRouletteReward(result);
-            // Resume idle spin (maybe reset offset to match current?)
-            // Actually we just start incrementing from where we are
-            rouletteGame.idleOffset = parseFloat(track.dataset.currentOffset);
             rouletteGame.startIdleSpin();
-        }, CONFIG.roulette.spinDuration + 500);
-    }
-};
+        },
 
-// --- Cups Game Engine ---
-const cupsGame = {
-    container: null,
-    message: null,
-    cups: [], // Array of DOM elements
-    positions: [], // Array of X coordinates
-    currentLevel: 1,
-    round: 0,
-    correctGuesses: 0,
-    targetCupIndex: 0, // 0, 1, 2 - where the item IS
-    isAnimating: false,
-    isActive: false, // New flag for session tracking
-    timerInterval: null,
-    timeLeft: 10,
+        startIdleSpin: () => {
+            if (rouletteGame.idleRequestId) cancelAnimationFrame(rouletteGame.idleRequestId);
 
-    init: () => {
-        cupsGame.container = document.getElementById('cups-area');
-        cupsGame.message = document.getElementById('cups-message');
-    },
+            const animate = () => {
+                if (rouletteGame.isSpinning) return;
+                const track = document.getElementById('roulette-track');
+                if (!track) return;
 
-    prepare: () => {
-        app.switchScreen('screen-cups-intro');
-        // Intro is handled by HTML, wait for "Start" click
-    },
+                // Slow scroll
+                rouletteGame.idleOffset += 0.5; // pixels per frame (approx 30px/sec at 60fps)
+                track.style.transform = `translateX(-${rouletteGame.idleOffset}px)`;
 
-    start: () => {
-        if (!cupsGame.container) cupsGame.init();
-        app.switchScreen('screen-cups-game');
-        document.body.className = 'bg-cups';
-        cupsGame.isActive = true; // Mark session active
-        cupsGame.currentLevel = STATE.games.cups.level;
-        cupsGame.round = 0;
-        cupsGame.correctGuesses = 0;
-        cupsGame.updateStats();
+                // Reset to avoid running out
+                const maxOffset = 80 * (window.innerWidth <= 480 ? 100 : 110);
+                if (rouletteGame.idleOffset > maxOffset) {
+                    rouletteGame.idleOffset = 20 * (window.innerWidth <= 480 ? 100 : 110); // Reset to start
+                }
 
-        // Reset Timer Display
-        const timerEl = document.getElementById('cups-time');
-        if (timerEl) timerEl.innerText = 10;
+                rouletteGame.idleRequestId = requestAnimationFrame(animate);
+            };
+            rouletteGame.idleRequestId = requestAnimationFrame(animate);
+        },
 
-        cupsGame.startRound();
-    },
+        stopIdleSpin: () => {
+            if (rouletteGame.idleRequestId) cancelAnimationFrame(rouletteGame.idleRequestId);
+        },
 
-    updateStats: () => {
-        document.getElementById('cups-round').innerText = `${cupsGame.round + 1}/3`;
-        document.getElementById('cups-level-display').innerText = cupsGame.currentLevel;
-    },
+        spin: () => {
+            if (rouletteGame.isSpinning) return;
+            rouletteGame.stopIdleSpin();
 
-    startRound: () => {
-        if (cupsGame.round >= 3) {
-            cupsGame.endGame();
-            return;
+            // Check availability
+            const now = Date.now();
+            const canSpin = (STATE.games.roulette._es > 0) || (now >= STATE.games.roulette._nfs);
+
+            if (!canSpin) return;
+
+            if (STATE.games.roulette._es > 0) STATE.games.roulette._es--;
+            else STATE.games.roulette._nfs = now + CONFIG.roulette.cooldown;
+
+            app.saveState();
+            app.updateUI();
+
+            rouletteGame.isSpinning = true;
+            const track = document.getElementById('roulette-track');
+            const itemWidth = window.innerWidth <= 480 ? 100 : 110;
+
+            // Determine result
+            const totalWeight = CONFIG.roulette.rewards.reduce((acc, r) => acc + r.weight, 0);
+            let rnd = Math.random() * totalWeight;
+            let result = null;
+            for (let r of CONFIG.roulette.rewards) {
+                if (rnd < r.weight) { result = r; break; }
+                rnd -= r.weight;
+            }
+            if (!result) result = CONFIG.roulette.rewards[0];
+
+            // Handle random snowflake amount
+            if (result.id === 'snow_rnd') {
+                result.val = Math.floor(Math.random() * 300) + 1;
+                result.name = `${result.val} Снежинок`;
+            }
+
+            // Setup winning item in the track
+            // We spin forward by ~40 items from current position
+            const currentOffset = parseFloat(track.dataset.currentOffset || 0);
+            const currentItemIndex = Math.floor(currentOffset / itemWidth);
+            const targetIndex = currentItemIndex + 40 + Math.floor(Math.random() * 5); // Add random variation
+
+            // Fix: Dynamically append items if we are running out
+            if (targetIndex >= rouletteGame.items.length - 10) {
+                const rewards = CONFIG.roulette.rewards;
+                for (let k = 0; k < 50; k++) {
+                    let r = rewards[Math.floor(Math.random() * rewards.length)];
+                    // Simple reroll logic for rares to avoid clustering (simplified from init)
+                    const isRare = (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost');
+                    if (isRare && Math.random() < 0.7) continue;
+
+                    rouletteGame.items.push(r);
+                    const el = document.createElement('div');
+                    el.className = 'roulette-item';
+                    if (r.id === 'snow1000' || r.id === 'tg25' || r.id === 'boost' || r.id === 'cup_hint') el.classList.add('super-rare');
+                    else if (r.type === 'special' || r.type === 'buff') el.classList.add('rare');
+
+                    if (r.id === 'cup_hint') { el.style.border = '2px solid #ffd700'; el.style.boxShadow = '0 0 15px #ffd700'; }
+                    if (r.id === 'snow10') { el.classList.remove('rare', 'super-rare'); el.style.border = 'none'; el.style.boxShadow = 'none'; }
+
+                    el.innerHTML = `<img src="${r.img}"><span>${r.name}</span>`;
+                    track.appendChild(el);
+                }
+            }
+
+            // Re-query items to include new ones
+            const allItems = track.querySelectorAll('.roulette-item');
+
+            const targetEl = allItems[targetIndex];
+            if (targetEl) {
+                targetEl.innerHTML = `<img src="${result.img}"><span>${result.name}</span>`;
+                targetEl.className = 'roulette-item'; // Reset classes
+
+                if (result.id === 'snow1000' || result.id === 'tg25' || result.id === 'boost' || result.id === 'cup_hint') {
+                    targetEl.classList.add('super-rare');
+                } else if (result.type === 'special' || result.type === 'buff') {
+                    targetEl.classList.add('rare');
+                }
+            }
+
+            // Animation
+            // Center the target item
+            // offset = (targetIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2)
+            const containerWidth = track.parentElement.clientWidth;
+            const targetOffset = (targetIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2);
+
+            // Start Spin
+            track.style.transition = `transform ${CONFIG.roulette.spinDuration}ms cubic-bezier(0.1, 0, 0.2, 1)`;
+            track.style.transform = `translateX(-${targetOffset}px)`;
+            track.dataset.currentOffset = targetOffset;
+
+            setTimeout(() => {
+                rouletteGame.isSpinning = false;
+                app.showRouletteReward(result);
+                // Resume idle spin (maybe reset offset to match current?)
+                // Actually we just start incrementing from where we are
+                rouletteGame.idleOffset = parseFloat(track.dataset.currentOffset);
+                rouletteGame.startIdleSpin();
+            }, CONFIG.roulette.spinDuration + 500);
         }
+    };
 
-        cupsGame.isAnimating = true;
-        cupsGame.updateStats();
-        cupsGame.container.innerHTML = '';
-        cupsGame.message.innerText = "Следи за предметом!";
+    // --- Cups Game Engine ---
+    const cupsGame = {
+        container: null,
+        message: null,
+        cups: [], // Array of DOM elements
+        positions: [], // Array of X coordinates
+        currentLevel: 1,
+        round: 0,
+        correctGuesses: 0,
+        targetCupIndex: 0, // 0, 1, 2 - where the item IS
+        isAnimating: false,
+        isActive: false, // New flag for session tracking
+        timerInterval: null,
+        timeLeft: 10,
 
-        // Reset Timer Display Immediately
-        const timerEl = document.getElementById('cups-time');
-        if (timerEl) timerEl.innerText = "10";
+        init: () => {
+            cupsGame.container = document.getElementById('cups-area');
+            cupsGame.message = document.getElementById('cups-message');
+        },
 
-        // New round - reset active hint state for safety, or keep?
-        // "Updated timer... round starts... hint player will have until he uses it."
-        // If he uses it, it's consumed. If he doesn't, does he keep it? 
-        // "Button with hint... writes 0 and not clickable"
-        // So if he has hints in inventory, badge > 0.
-        // When he clicks, hintActive = true.
-        // Reset active hint at start of round (it applies to the specific shuffle).
-        STATE.games.cups.hintActive = false;
-        cupsGame.updateHintButton();
+        prepare: () => {
+            app.switchScreen('screen-cups-intro');
+            // Intro is handled by HTML, wait for "Start" click
+        },
 
-        // Determine assets
-        // Level 1: sk1, Lvl 2: sk2, Lvl 3: sk3, Lvl 4: sk1...
-        const cupImgSrc = `sk${(cupsGame.currentLevel - 1) % 3 + 1}.png`;
-        // Item: led or prnik. Alternate.
-        const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
+        start: () => {
+            if (!cupsGame.container) cupsGame.init();
+            app.switchScreen('screen-cups-game');
+            document.body.className = 'bg-cups';
+            cupsGame.isActive = true; // Mark session active
+            cupsGame.currentLevel = STATE.games.cups.level;
+            cupsGame.round = 0;
+            cupsGame.correctGuesses = 0;
+            cupsGame.updateStats();
 
-        // Calculate positions
-        // Container width ~ 350-400px (mobile vs desktop).
-        // We use % for responsive.
-        const posPercents = [5, 35, 65]; // Center points? No, left positions.
-        // 3 cups.
+            // Reset Timer Display
+            const timerEl = document.getElementById('cups-time');
+            if (timerEl) timerEl.innerText = 10;
 
-        cupsGame.cups = [];
-        // Create Cups
-        for (let i = 0; i < 3; i++) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'cup-wrapper';
-            wrapper.style.left = posPercents[i] + '%';
-            wrapper.dataset.index = i; // Logical index
+            cupsGame.startRound();
+        },
 
-            // Inner HTML
-            wrapper.innerHTML = `
+        updateStats: () => {
+            document.getElementById('cups-round').innerText = `${cupsGame.round + 1}/3`;
+            document.getElementById('cups-level-display').innerText = cupsGame.currentLevel;
+        },
+
+        startRound: () => {
+            if (cupsGame.round >= 3) {
+                cupsGame.endGame();
+                return;
+            }
+
+            cupsGame.isAnimating = true;
+            cupsGame.updateStats();
+            cupsGame.container.innerHTML = '';
+            cupsGame.message.innerText = "Следи за предметом!";
+
+            // Reset Timer Display Immediately
+            const timerEl = document.getElementById('cups-time');
+            if (timerEl) timerEl.innerText = "10";
+
+            // New round - reset active hint state for safety, or keep?
+            // "Updated timer... round starts... hint player will have until he uses it."
+            // If he uses it, it's consumed. If he doesn't, does he keep it? 
+            // "Button with hint... writes 0 and not clickable"
+            // So if he has hints in inventory, badge > 0.
+            // When he clicks, hintActive = true.
+            // Reset active hint at start of round (it applies to the specific shuffle).
+            STATE.games.cups.hintActive = false;
+            cupsGame.updateHintButton();
+
+            // Determine assets
+            // Level 1: sk1, Lvl 2: sk2, Lvl 3: sk3, Lvl 4: sk1...
+            const cupImgSrc = `sk${(cupsGame.currentLevel - 1) % 3 + 1}.png`;
+            // Item: led or prnik. Alternate.
+            const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
+
+            // Calculate positions
+            // Container width ~ 350-400px (mobile vs desktop).
+            // We use % for responsive.
+            const posPercents = [5, 35, 65]; // Center points? No, left positions.
+            // 3 cups.
+
+            cupsGame.cups = [];
+            // Create Cups
+            for (let i = 0; i < 3; i++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'cup-wrapper';
+                wrapper.style.left = posPercents[i] + '%';
+                wrapper.dataset.index = i; // Logical index
+
+                // Inner HTML
+                wrapper.innerHTML = `
                     <img src="${itemImgSrc}" class="cup-item" style="display: none;">
                     <img src="${cupImgSrc}" class="cup-img">
                 `;
 
-            cupsGame.container.appendChild(wrapper);
-            cupsGame.cups.push({
-                el: wrapper,
-                posIndex: i, // Current visual position index (0,1,2)
-                hasItem: false
-            });
+                cupsGame.container.appendChild(wrapper);
+                cupsGame.cups.push({
+                    el: wrapper,
+                    posIndex: i, // Current visual position index (0,1,2)
+                    hasItem: false
+                });
 
-            wrapper.addEventListener('click', () => cupsGame.handleClick(i));
-        }
+                wrapper.addEventListener('click', () => cupsGame.handleClick(i));
+            }
 
-        // Pick target
-        cupsGame.targetCupIndex = Math.floor(Math.random() * 3);
-        cupsGame.cups[cupsGame.targetCupIndex].hasItem = true;
+            // Pick target
+            cupsGame.targetCupIndex = Math.floor(Math.random() * 3);
+            cupsGame.cups[cupsGame.targetCupIndex].hasItem = true;
 
-        // Show item in target cup (hidden initially, we animate reveal)
-        const targetWrapper = cupsGame.cups[cupsGame.targetCupIndex].el;
-        targetWrapper.querySelector('.cup-item').style.display = 'block';
+            // Show item in target cup (hidden initially, we animate reveal)
+            const targetWrapper = cupsGame.cups[cupsGame.targetCupIndex].el;
+            targetWrapper.querySelector('.cup-item').style.display = 'block';
 
-        // Animation Sequence
-        // 1. Show big item overlay
-        setTimeout(() => {
-            cupsGame.animateReveal(itemImgSrc, targetWrapper);
-        }, 500);
-    },
+            // Animation Sequence
+            // 1. Show big item overlay
+            setTimeout(() => {
+                cupsGame.animateReveal(itemImgSrc, targetWrapper);
+            }, 500);
+        },
 
-    animateReveal: (itemSrc, targetEl) => {
-        // Create overlay if not exists
-        let overlay = document.getElementById('cups-reveal-overlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'cups-reveal-overlay';
-            overlay.className = 'reveal-overlay';
-            overlay.innerHTML = `<img src="" class="reveal-item">`;
-            document.body.appendChild(overlay);
-        }
+        animateReveal: (itemSrc, targetEl) => {
+            // Create overlay if not exists
+            let overlay = document.getElementById('cups-reveal-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'cups-reveal-overlay';
+                overlay.className = 'reveal-overlay';
+                overlay.innerHTML = `<img src="" class="reveal-item">`;
+                document.body.appendChild(overlay);
+            }
 
-        const img = overlay.querySelector('img');
-        img.src = itemSrc;
+            const img = overlay.querySelector('img');
+            img.src = itemSrc;
 
-        overlay.classList.add('active');
-
-        setTimeout(() => {
-            // Shrink and move to target
-            // We can't easily tween to the exact cup position with CSS classes alone efficiently without complex calculations.
-            // Simplified: Fade out overlay, lift target cup to show item.
-
-            overlay.classList.remove('active');
-
-            // Lift cup
-            targetEl.classList.add('lift');
+            overlay.classList.add('active');
 
             setTimeout(() => {
-                targetEl.classList.remove('lift');
+                // Shrink and move to target
+                // We can't easily tween to the exact cup position with CSS classes alone efficiently without complex calculations.
+                // Simplified: Fade out overlay, lift target cup to show item.
+
+                overlay.classList.remove('active');
+
+                // Lift cup
+                targetEl.classList.add('lift');
+
                 setTimeout(() => {
-                    cupsGame.shuffle();
-                }, 500);
-            }, 1000);
-        }, 1500);
-    },
+                    targetEl.classList.remove('lift');
+                    setTimeout(() => {
+                        cupsGame.shuffle();
+                    }, 500);
+                }, 1000);
+            }, 1500);
+        },
 
-    shuffle: () => {
-        cupsGame.message.innerText = "Перемешиваю...";
+        shuffle: () => {
+            cupsGame.message.innerText = "Перемешиваю...";
 
-        // Duration: 10 seconds fixed
-        const DURATION = 10000;
-        const startTime = Date.now();
+            // Duration: 10 seconds fixed
+            const DURATION = 10000;
+            const startTime = Date.now();
 
-        // Speed based on level
-        // Speed based on level
-        // Lvl 1: Faster (~850ms). Lvl 12: Super Fast (~200ms).
-        const level = cupsGame.currentLevel;
-        const speed = Math.max(200, 850 - ((level - 1) * 75));
+            // Speed based on level
+            // Speed based on level
+            // Lvl 1: Faster (~850ms). Lvl 12: Super Fast (~200ms).
+            const level = cupsGame.currentLevel;
+            const speed = Math.max(200, 850 - ((level - 1) * 75));
 
-        const posPercents = [5, 35, 65];
+            const posPercents = [5, 35, 65];
 
-        const doSwap = () => {
-            if (Date.now() - startTime >= DURATION) {
-                cupsGame.isAnimating = false;
-                cupsGame.message.innerText = "Где предмет?";
-                cupsGame.startTimer();
-                return;
-            }
-
-            // Pick 2 random distinct indices
-            let a = Math.floor(Math.random() * 3);
-            let b = Math.floor(Math.random() * 3);
-            while (a === b) b = Math.floor(Math.random() * 3);
-
-            // Swap visual positions in array logic
-            const cupA = cupsGame.cups.find(c => c.posIndex === a);
-            const cupB = cupsGame.cups.find(c => c.posIndex === b);
-
-            // Swap posIndex
-            cupA.posIndex = b;
-            cupB.posIndex = a;
-
-            // Animate
-            cupA.el.style.left = posPercents[b] + '%';
-            cupB.el.style.left = posPercents[a] + '%';
-
-            setTimeout(doSwap, speed);
-        };
-
-        // Security: Remove items from DOM during shuffle so they can't be inspected
-        cupsGame.cups.forEach(c => {
-            const item = c.el.querySelector('.cup-item');
-            if (item) item.remove();
-        });
-
-        doSwap();
-    },
-
-    startTimer: () => {
-        cupsGame.timeLeft = 10;
-        const timerEl = document.getElementById('cups-time');
-        if (timerEl) timerEl.innerText = cupsGame.timeLeft;
-
-        if (cupsGame.timerInterval) clearInterval(cupsGame.timerInterval);
-
-        cupsGame.timerInterval = setInterval(() => {
-            cupsGame.timeLeft--;
-            if (timerEl) {
-                timerEl.innerText = cupsGame.timeLeft;
-                // Gradient effect
-                if (cupsGame.timeLeft <= 10) {
-                    timerEl.classList.remove('text-gradient-normal');
-                    timerEl.classList.add('text-gradient-red');
-                } else {
-                    timerEl.classList.add('text-gradient-normal');
-                    timerEl.classList.remove('text-gradient-red');
+            const doSwap = () => {
+                if (Date.now() - startTime >= DURATION) {
+                    cupsGame.isAnimating = false;
+                    cupsGame.message.innerText = "Где предмет?";
+                    cupsGame.startTimer();
+                    return;
                 }
-            }
 
-            if (cupsGame.timeLeft <= 0) {
-                cupsGame.stopTimer();
-                cupsGame.handleTimeout();
-            }
-        }, 1000);
-    },
+                // Pick 2 random distinct indices
+                let a = Math.floor(Math.random() * 3);
+                let b = Math.floor(Math.random() * 3);
+                while (a === b) b = Math.floor(Math.random() * 3);
 
-    stopTimer: () => {
-        if (cupsGame.timerInterval) clearInterval(cupsGame.timerInterval);
-    },
+                // Swap visual positions in array logic
+                const cupA = cupsGame.cups.find(c => c.posIndex === a);
+                const cupB = cupsGame.cups.find(c => c.posIndex === b);
 
-    handleTimeout: () => {
-        cupsGame.isAnimating = true; // Block clicks
-        cupsGame.message.innerText = "Время вышло!";
+                // Swap posIndex
+                cupA.posIndex = b;
+                cupB.posIndex = a;
 
-        // Show correct answer
-        const correctCup = cupsGame.cups.find(c => c.hasItem);
-        // Show correct answer
-        const correctCup = cupsGame.cups.find(c => c.hasItem);
-        // Restore item for reveal
-        if (!correctCup.el.querySelector('.cup-item')) {
-            const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
-            const item = document.createElement('img');
-            item.src = itemImgSrc;
-            item.className = 'cup-item';
-            item.style.display = 'block';
-            correctCup.el.prepend(item);
-        }
+                // Animate
+                cupA.el.style.left = posPercents[b] + '%';
+                cupB.el.style.left = posPercents[a] + '%';
 
-        correctCup.el.classList.add('lift');
-        correctCup.el.classList.add('wrong'); // Mark as red/wrong context
+                setTimeout(doSwap, speed);
+            };
 
-        setTimeout(() => {
-            cupsGame.showRoundResult(false);
-        }, 1500);
-    },
+            // Security: Remove items from DOM during shuffle so they can't be inspected
+            cupsGame.cups.forEach(c => {
+                const item = c.el.querySelector('.cup-item');
+                if (item) item.remove();
+            });
 
-    handleClick: (originalIndex) => {
-        if (cupsGame.isAnimating) return;
-        cupsGame.stopTimer();
+            doSwap();
+        },
 
-        const cupObj = cupsGame.cups[originalIndex];
+        startTimer: () => {
+            cupsGame.timeLeft = 10;
+            const timerEl = document.getElementById('cups-time');
+            if (timerEl) timerEl.innerText = cupsGame.timeLeft;
 
-        // Restore item if this cup has it (or even if not, logic handles hidden/shown, but we only strictly need it for the winner)
-        // Actually we should restore for the winner regardless of which one was clicked, effectively.
-        // But specifically for the clicked one if it's the winner.
-        if (cupObj.hasItem) {
-            const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
-            if (!cupObj.el.querySelector('.cup-item')) {
-                const item = document.createElement('img');
-                item.src = itemImgSrc;
-                item.className = 'cup-item';
-                item.style.display = 'block';
-                cupObj.el.prepend(item);
-            }
-        }
+            if (cupsGame.timerInterval) clearInterval(cupsGame.timerInterval);
 
-        cupsGame.isAnimating = true; // Block clicks
-        cupObj.el.classList.add('lift');
+            cupsGame.timerInterval = setInterval(() => {
+                cupsGame.timeLeft--;
+                if (timerEl) {
+                    timerEl.innerText = cupsGame.timeLeft;
+                    // Gradient effect
+                    if (cupsGame.timeLeft <= 10) {
+                        timerEl.classList.remove('text-gradient-normal');
+                        timerEl.classList.add('text-gradient-red');
+                    } else {
+                        timerEl.classList.add('text-gradient-normal');
+                        timerEl.classList.remove('text-gradient-red');
+                    }
+                }
 
-        let isWin = false;
-        if (cupObj.hasItem) {
-            cupObj.el.classList.add('correct');
-            cupsGame.correctGuesses++;
-            isWin = true;
-        } else {
-            cupObj.el.classList.add('wrong');
-            // Show where it was
-            // Show where it was
+                if (cupsGame.timeLeft <= 0) {
+                    cupsGame.stopTimer();
+                    cupsGame.handleTimeout();
+                }
+            }, 1000);
+        },
+
+        stopTimer: () => {
+            if (cupsGame.timerInterval) clearInterval(cupsGame.timerInterval);
+        },
+
+        handleTimeout: () => {
+            cupsGame.isAnimating = true; // Block clicks
+            cupsGame.message.innerText = "Время вышло!";
+
+            // Show correct answer
             const correctCup = cupsGame.cups.find(c => c.hasItem);
+            // Show correct answer
 
-            // Restore item for correct cup
+            // Restore item for reveal
             if (!correctCup.el.querySelector('.cup-item')) {
                 const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
                 const item = document.createElement('img');
@@ -1087,555 +1073,848 @@ const cupsGame = {
                 correctCup.el.prepend(item);
             }
 
-            setTimeout(() => correctCup.el.classList.add('lift'), 500);
-        }
+            correctCup.el.classList.add('lift');
+            correctCup.el.classList.add('wrong'); // Mark as red/wrong context
 
-        setTimeout(() => {
-            cupsGame.showRoundResult(isWin);
-        }, 1500);
-    },
+            setTimeout(() => {
+                cupsGame.showRoundResult(false);
+            }, 1500);
+        },
 
-    showRoundResult: (win) => {
-        const modal = document.getElementById('cups-round-result');
-        const title = document.getElementById('cups-round-title');
-        const img = document.getElementById('cups-round-img');
-        const msg = document.getElementById('cups-round-msg');
+        handleClick: (originalIndex) => {
+            if (cupsGame.isAnimating) return;
+            cupsGame.stopTimer();
 
-        if (win) {
-            title.innerText = "Верно!";
-            img.src = "dedpobeda.png";
-            msg.innerText = "Молодец! Так держать!";
-        } else {
-            title.innerText = "Ошибочка...";
-            img.src = "dedlose.png";
-            msg.innerText = "Не расстраивайся, повезет в следующий раз!";
-        }
+            const cupObj = cupsGame.cups[originalIndex];
 
-        modal.classList.add('active');
+            // Restore item if this cup has it (or even if not, logic handles hidden/shown, but we only strictly need it for the winner)
+            // Actually we should restore for the winner regardless of which one was clicked, effectively.
+            // But specifically for the clicked one if it's the winner.
+            if (cupObj.hasItem) {
+                const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
+                if (!cupObj.el.querySelector('.cup-item')) {
+                    const item = document.createElement('img');
+                    item.src = itemImgSrc;
+                    item.className = 'cup-item';
+                    item.style.display = 'block';
+                    cupObj.el.prepend(item);
+                }
+            }
 
-        setTimeout(() => {
-            modal.classList.remove('active');
-            cupsGame.round++;
-            cupsGame.startRound();
-        }, 2500);
-    },
+            cupsGame.isAnimating = true; // Block clicks
+            cupObj.el.classList.add('lift');
 
-    endGame: () => {
-        cupsGame.isAnimating = false;
-        cupsGame.isActive = false; // Session over
-        let win = false;
-        let reward = 0;
-        const level = cupsGame.currentLevel;
+            let isWin = false;
+            if (cupObj.hasItem) {
+                cupObj.el.classList.add('correct');
+                cupsGame.correctGuesses++;
+                isWin = true;
+            } else {
+                cupObj.el.classList.add('wrong');
+                // Show where it was
+                // Show where it was
+                const correctCup = cupsGame.cups.find(c => c.hasItem);
 
-        // Rewards
-        // 0/3: 0
-        // 1/3: 15 + (lvl-1)*10
-        // 2/3: 30 + (lvl-1)*10
-        // 3/3: 80 + (lvl-1)*10
+                // Restore item for correct cup
+                if (!correctCup.el.querySelector('.cup-item')) {
+                    const itemImgSrc = (cupsGame.currentLevel + cupsGame.round) % 2 === 0 ? 'led.png' : 'prnik.png';
+                    const item = document.createElement('img');
+                    item.src = itemImgSrc;
+                    item.className = 'cup-item';
+                    item.style.display = 'block';
+                    correctCup.el.prepend(item);
+                }
 
-        const bonus = (level - 1) * CONFIG.cups.rewardGrowth;
+                setTimeout(() => correctCup.el.classList.add('lift'), 500);
+            }
 
-        if (cupsGame.correctGuesses === 1) reward = CONFIG.cups.baseReward1 + bonus;
-        else if (cupsGame.correctGuesses === 2) reward = CONFIG.cups.baseReward2 + bonus;
-        else if (cupsGame.correctGuesses === 3) reward = CONFIG.cups.baseReward3 + bonus;
+            setTimeout(() => {
+                cupsGame.showRoundResult(isWin);
+            }, 1500);
+        },
 
-        if (reward > 0) {
-            SecureStore.addBalance(reward);
-            win = true;
+        showRoundResult: (win) => {
+            const modal = document.getElementById('cups-round-result');
+            const title = document.getElementById('cups-round-title');
+            const img = document.getElementById('cups-round-img');
+            const msg = document.getElementById('cups-round-msg');
 
-            if (STATE.games.cups.level < 12) STATE.games.cups.level++;
-            else STATE.games.cups.level = 1;
+            if (win) {
+                title.innerText = "Верно!";
+                img.src = "dedpobeda.png";
+                msg.innerText = "Молодец! Так держать!";
+            } else {
+                title.innerText = "Ошибочка...";
+                img.src = "dedlose.png";
+                msg.innerText = "Не расстраивайся, повезет в следующий раз!";
+            }
 
-            // Win = Cooldown too (Requested by user)
-            STATE.games.cups.lastPlayed = Date.now();
+            modal.classList.add('active');
 
-            // Reset Hint
-            STATE.games.cups.hintActive = false;
-        } else {
-            // Lose = Cooldown
-            STATE.games.cups.lastPlayed = Date.now();
-            STATE.games.cups.hintActive = false;
-        }
+            setTimeout(() => {
+                modal.classList.remove('active');
+                cupsGame.round++;
+                cupsGame.startRound();
+            }, 2500);
+        },
 
-        app.saveState();
+        endGame: () => {
+            cupsGame.isAnimating = false;
+            cupsGame.isActive = false; // Session over
+            let win = false;
+            let reward = 0;
+            const level = cupsGame.currentLevel;
 
-        // Show Result
-        app.finishCupGame(cupsGame.correctGuesses, reward);
-    },
+            // Rewards
+            // 0/3: 0
+            // 1/3: 15 + (lvl-1)*10
+            // 2/3: 30 + (lvl-1)*10
+            // 3/3: 80 + (lvl-1)*10
 
-    updateHintButton: () => {
-        const btn = document.getElementById('btn-cups-hint');
-        const badge = document.getElementById('cups-hint-count');
-        const count = STATE.games.cups.hints || 0;
+            const bonus = (level - 1) * CONFIG.cups.rewardGrowth;
 
-        if (badge) badge.innerText = count;
+            if (cupsGame.correctGuesses === 1) reward = CONFIG.cups.baseReward1 + bonus;
+            else if (cupsGame.correctGuesses === 2) reward = CONFIG.cups.baseReward2 + bonus;
+            else if (cupsGame.correctGuesses === 3) reward = CONFIG.cups.baseReward3 + bonus;
 
-        if (count > 0 && !STATE.games.cups.hintActive) {
-            btn.classList.remove('disabled');
-        } else {
-            btn.classList.add('disabled');
-        }
-    },
+            if (reward > 0) {
+                SecureStore.addBalance(reward);
+                win = true;
 
-    useHint: () => {
-        // User says: "On the button will be written digit... till he uses it."
-        // Assuming usage is allowed during the round (shuffle or guess).
-        // Check if game is in progress?
-        if (!cupsGame.isAnimating && cupsGame.timeLeft <= 0) return;
-        // We allow usage even during shuffle for better feedback
+                if (STATE.games.cups.level < 12) STATE.games.cups.level++;
+                else STATE.games.cups.level = 1;
 
-        if (STATE.games.cups.hints > 0 && !STATE.games.cups.hintActive) {
-            STATE.games.cups.hints--;
-            STATE.games.cups.hintActive = true;
-            cupsGame.updateHintButton();
+                // Win = Cooldown too (Requested by user)
+                STATE.games.cups._lp = Date.now();
 
-            // Show Arrow
-            // Check if cups exist
-            if (cupsGame.cups && cupsGame.cups[cupsGame.targetCupIndex]) {
-                const hintEl = document.createElement('div');
-                hintEl.className = 'cup-hint-arrow';
-                cupsGame.cups[cupsGame.targetCupIndex].el.appendChild(hintEl);
+                // Reset Hint
+                STATE.games.cups.hintActive = false;
+            } else {
+                // Lose = Cooldown
+                STATE.games.cups._lp = Date.now();
+                STATE.games.cups.hintActive = false;
             }
 
             app.saveState();
-        }
-    }
-};
 
+            // Show Result
+            app.finishCupGame(cupsGame.correctGuesses, reward);
+        },
 
+        updateHintButton: () => {
+            const btn = document.getElementById('btn-cups-hint');
+            const badge = document.getElementById('cups-hint-count');
+            const count = STATE.games.cups.hints || 0;
 
-// --- App Controller ---
-const app = {
-    init: () => {
-        soundManager.init();
-        app.loadState();
-        app.createSnow();
-        app.updateUI();
-        app.startTicks();
-        app.bindEvents();
-        app.initCarousel();
+            if (badge) badge.innerText = count;
 
-        // Initial Route
-        app.handleHash();
-        if (!window.location.hash) {
-            // Default to loading if no hash
-            window.location.hash = 'loading';
-        }
-
-        // Preload Images
-        app.preloadAssets();
-        const preloadLose = new Image(); preloadLose.src = 'dedlose.png';
-        const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
-
-
-    },
-
-    playIntro: () => {
-        const title = document.querySelector('.main-title');
-        const santa = document.querySelector('.ded-img');
-        const bubble = document.querySelector('.speech-bubble');
-        const btn = document.getElementById('btn-start-adventure');
-
-        // Reset state
-        title.classList.remove('title-enter', 'title-move-up');
-        santa.classList.remove('bounce-in', 'santa-enter');
-        santa.style.opacity = '0';
-        btn.style.opacity = '0';
-        bubble.style.opacity = '0';
-
-        // Sequence
-        // 1. Title appears in center
-        title.classList.add('title-enter');
-
-        // 2. Title moves up after 1.5s
-        setTimeout(() => {
-            title.classList.add('title-move-up');
-
-            // 3. Santa appears
-            setTimeout(() => {
-                santa.classList.add('santa-enter');
-
-                // 4. Bubble and Button
-                setTimeout(() => {
-                    bubble.style.transition = 'opacity 0.5s';
-                    bubble.style.opacity = '1';
-                    btn.style.transition = 'opacity 0.5s';
-                    btn.style.opacity = '1';
-                }, 800);
-            }, 500);
-        }, 1500);
-    },
-
-    initCarousel: () => {
-        const container = document.querySelector('.games-grid');
-        if (!container) return;
-
-        // State
-        let scrollY = 0; // Visual position (0 = card 0 centered, 1 = card 1 centered)
-        let velocity = 0;
-        let isDragging = false;
-        let startY = 0;
-        let lastY = 0;
-        let lastTime = 0;
-        let targetScrollY = 0; // For snapping
-        let rafId = null;
-
-        const items = Array.from(container.querySelectorAll('.game-card'));
-        const cardHeight = 220; // Virtual height info for spacing calculations
-        const spacing = 140; // Pixels distance between cards visually
-
-        // Animation Loop
-        const update = () => {
-            // Physics
-            if (!isDragging) {
-                // Inertia & Snapping
-                velocity *= 0.95; // Friction
-
-                // Snap to nearest integer if slow enough
-                if (Math.abs(velocity) < 0.01) {
-                    const snapTarget = Math.round(scrollY);
-                    const diff = snapTarget - scrollY;
-                    scrollY += diff * 0.1; // Smooth snap lerp
-                    velocity = 0;
-                } else {
-                    scrollY += velocity;
-                }
-
-                // Bounds (Rubber band effect or hard clamp?)
-                // Hard clamp for simplicity + 0.5 buffer
-                // Bounds (Rubber band effect)
-                const maxIndex = items.length - 1;
-                // Clamp velocity if OOB?
-
-                if (scrollY < -0.2) {
-                    // Smooth bounce back
-                    const force = (-0.0 - scrollY) * 0.1;
-                    velocity += force;
-                    velocity *= 0.8;
-                }
-                if (scrollY > maxIndex + 0.2) {
-                    const force = (maxIndex + 0.0 - scrollY) * 0.1;
-                    velocity += force;
-                    velocity *= 0.8;
-                }
+            if (count > 0 && !STATE.games.cups.hintActive) {
+                btn.classList.remove('disabled');
+            } else {
+                btn.classList.add('disabled');
             }
+        },
 
-            // Render
-            items.forEach((item, index) => {
-                const dist = index - scrollY; // Distance from center (0 = center)
+        useHint: () => {
+            // User says: "On the button will be written digit... till he uses it."
+            // Assuming usage is allowed during the round (shuffle or guess).
+            // Check if game is in progress?
+            if (!cupsGame.isAnimating && cupsGame.timeLeft <= 0) return;
+            // We allow usage even during shuffle for better feedback
 
-                // Visual parameters
-                const scale = Math.max(0.7, 1 - Math.abs(dist) * 0.15);
-                const opacity = Math.max(0.2, 1 - Math.abs(dist) * 0.4);
-                // Optimization: Disable blur on mobile or if performance is low
-                const isMobile = window.innerWidth < 768;
-                const blur = isMobile ? 0 : Math.min(10, Math.abs(dist) * 5);
-                const yOffset = dist * spacing;
-                const zIndex = 100 - Math.round(Math.abs(dist) * 10);
+            if (STATE.games.cups.hints > 0 && !STATE.games.cups.hintActive) {
+                STATE.games.cups.hints--;
+                STATE.games.cups.hintActive = true;
+                cupsGame.updateHintButton();
 
-                // Apply styles
-                item.style.transform = `translate(-50%, calc(-50% + ${yOffset}px)) scale(${scale})`;
-                item.style.opacity = opacity;
-                item.style.filter = `blur(${blur}px)`;
-                item.style.zIndex = zIndex;
-
-                // Interaction state
-                // Only centered item (dist < 0.5) is interactive?
-                // Or manage pointer-events
-                if (Math.abs(dist) < 0.5) {
-                    item.style.pointerEvents = 'auto';
-                    item.classList.add('active-card');
-                } else {
-                    item.style.pointerEvents = 'none'; // Prevent clicking non-centered items (optional)
-                    item.classList.remove('active-card');
+                // Show Arrow
+                // Check if cups exist
+                if (cupsGame.cups && cupsGame.cups[cupsGame.targetCupIndex]) {
+                    const hintEl = document.createElement('div');
+                    hintEl.className = 'cup-hint-arrow';
+                    cupsGame.cups[cupsGame.targetCupIndex].el.appendChild(hintEl);
                 }
+
+                app.saveState();
+            }
+        }
+
+    };
+
+    // --- Ranking & Profile Logic ---
+    const rankingSystem = {
+        fakeUsers: [
+            { name: 'Levelller', stars: 450935, img: 'sk1.png' },
+            { name: 'Sha_kur_...', stars: 229591, img: 'sk2.png' },
+            { name: 'yxxx101', stars: 111386, img: 'sk3.png' },
+            { name: 'x_pp8', stars: 108889, img: 'sk1.png' },
+            { name: 'Santa_Claus', stars: 99999, img: 'dedprivet.png' },
+            { name: 'Elf_Pro', stars: 85400, img: 'sk2.png' },
+            { name: 'SnowQueen', stars: 76000, img: 'zima.png' },
+            { name: 'Grinch', stars: 12000, img: 'kaka.png' }
+        ],
+
+        updateLeaderboard: () => {
+            const list = document.getElementById('leaderboard-list');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const userScore = STATE.totalSnowflakes || 0; // Use total!
+            const userEntry = { name: 'Вы', stars: userScore, img: 'sk1.png', isUser: true };
+
+            // Meld and Sort
+            let all = [...rankingSystem.fakeUsers, userEntry];
+            all.sort((a, b) => b.stars - a.stars);
+
+            // Populate Main List (Top 50)
+            all.forEach((u, i) => {
+                const el = document.createElement('div');
+                el.className = 'leaderboard-item';
+
+                let rankClass = '';
+                let rankIcon = i + 1;
+                if (i === 0) rankIcon = '🥇';
+                if (i === 1) rankIcon = '🥈';
+                if (i === 2) rankIcon = '🥉';
+                if (i <= 2) rankClass = 'top-3';
+
+                el.innerHTML = `
+                    <div class="rank-idx ${rankClass}">${rankIcon}</div>
+                    <div class="rank-user">
+                        <img src="${u.img}" class="rank-avatar avatar-border-${Math.min(3, i + 1)}">
+                        <span>${u.name}</span>
+                    </div>
+                    <div class="rank-score">${u.stars}</div>
+                `;
+                list.appendChild(el);
             });
 
-            rafId = requestAnimationFrame(update);
-        };
-
-        // Start Loop
-        update();
-
-        // Event Listeners
-        // Touch
-        container.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            startY = e.touches[0].clientY;
-            lastY = startY;
-            velocity = 0;
-            // e.preventDefault(); // Stop page scroll?
-        }, { passive: false });
-
-        container.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
-            e.preventDefault(); // Take control of scroll
-            const y = e.touches[0].clientY;
-            const delta = y - lastY;
-            lastY = y;
-
-            // Move scrollY based on pixels. 
-            // Sensitivity: 1 pixel move = how much index move?
-            // dragging 100px should move 1 index approx?
-            scrollY -= delta / spacing;
-        }, { passive: false });
-
-        container.addEventListener('touchend', (e) => {
-            isDragging = false;
-            // Add velocity throw
-            const now = Date.now();
-            // Simple release, physics loop handles inertia friction
-        });
-
-        // Mouse Wheel
-        container.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            // OPTIMIZATION: Fix PC scroll sensitivity
-            // Clamp delta much harder so 1 notch isn't multiple items
-            let d = e.deltaY;
-            if (Math.abs(d) < 5) return; // Ignore microjitters
-
-            // Normalize scroll direction
-            const sign = Math.sign(d);
-
-            // Add a small constant amount per wheel tick instead of using raw delta
-            // This prevents "jumping" 2-3 items
-            velocity += sign * 0.05;
-
-            // Clamp total velocity to prevent runaway scrolling
-            velocity = Math.max(-0.2, Math.min(0.2, velocity));
-
-            // Wake up loop if needed (it runs always currently)
-        }, { passive: false });
-
-        // Expose for external updates (screen switch reset)
-        app.updateCarousel = () => {
-            // Determine which game is selected? Or just reset?
-            // Maybe keep last position?
-            // For now, no-op or re-clamp
-        };
-    },
-
-
-
-    showFloatingText: (text, color) => {
-        const el = document.createElement('div');
-        el.className = 'floating-text';
-        el.innerText = text;
-        el.style.color = color;
-        el.style.left = '50%';
-        el.style.top = '40%';
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 1000);
-    },
-
-
-
-    bindEvents: () => {
-        // Using hash navigation
-        document.getElementById('btn-start-adventure').addEventListener('click', () => { window.location.hash = 'menu'; });
-        document.getElementById('timer-starfall').addEventListener('click', () => app.tryStartGame('starfall'));
-
-        document.getElementById('timer-roulette').addEventListener('click', () => { window.location.hash = 'roulette'; });
-        document.getElementById('btn-rules-starfall').addEventListener('click', () => app.showRules('starfall'));
-        document.getElementById('btn-close-rules').addEventListener('click', app.closeRules);
-        document.getElementById('btn-result-menu').addEventListener('click', () => { window.location.hash = 'menu'; });
-
-        document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
-        document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
-        document.getElementById('btn-roulette-back').addEventListener('click', () => { window.location.hash = 'menu'; });
-
-        // New: Making the whole roulette card click open the game
-        document.getElementById('card-roulette').addEventListener('click', (e) => {
-            // If clicking button inside, don't double trigger
-            if (e.target.closest('#timer-roulette') || e.target.closest('.card-actions')) return;
-            window.location.hash = 'roulette';
-        });
-
-
-
-        // Hash Change Listener (The Router)
-        window.addEventListener('hashchange', app.handleHash);
-
-        document.getElementById('btn-claim-reward').addEventListener('click', app.claimReward);
-        document.getElementById('btn-sell-reward').addEventListener('click', app.sellReward);
-
-
-
-        // Result Screen Next Level
-        document.getElementById('btn-next-level').addEventListener('click', (e) => {
-            const btn = e.target; // or use currentTarget
-            if (btn.dataset.locked === "true") return; // Block click if locked
-
-            // Determine which game we are in?
-            // Currently only Cups uses this logic based on request
-            app.switchScreen('screen-game-loader');
-            setTimeout(() => {
-                cupsGame.start();
-            }, 2000);
-        });
-
-        // Cups Events
-        document.getElementById('btn-cups-hint').addEventListener('click', cupsGame.useHint);
-        document.getElementById('timer-cups').addEventListener('click', () => app.tryStartGame('cups'));
-        document.getElementById('btn-rules-cups').addEventListener('click', () => app.showRules('cups'));
-        document.getElementById('btn-start-cups').addEventListener('click', () => {
-            app.switchScreen('screen-game-loader');
-            // Optional: Customize loader text
-            const tip = document.getElementById('game-tip');
-            if (tip) tip.innerText = "Совет: Следи за стаканчиком очень внимательно!";
-
-            // setTimeout(() => {
-            //     cupsGame.start();
-            // }, 2000);
-            window.location.hash = 'cups-game';
-        });
-        document.getElementById('btn-cups-back').addEventListener('click', () => { window.location.hash = 'menu'; });
-
-        window.addEventListener('resize', () => {
-            if (document.getElementById('screen-game').classList.contains('active-screen')) starfallGame.resize();
-        });
-    },
-
-    loadState: () => {
-        const saved = localStorage.getItem('newyear_marathon_save_v4');
-        if (saved) {
-            const parsed = SECURITY.load(saved);
-            if (parsed) {
-                if (parsed.balance !== undefined) SecureStore.setBalance(parsed.balance);
-                STATE.cookies = parsed.cookies || 0;
-                if (parsed.games) {
-                    STATE.games.starfall = { ...STATE.games.starfall, ...parsed.games.starfall };
-                    STATE.games.roulette = { ...STATE.games.roulette, ...parsed.games.roulette };
-                    STATE.games.cups = { ...STATE.games.cups, ...parsed.games.cups };
-                }
+            // Update Sticky User Rank
+            const userRankIndex = all.findIndex(x => x.isUser);
+            const userRank = userRankIndex + 1;
+            const sticky = document.getElementById('current-user-rank-display');
+            if (sticky) {
+                sticky.innerHTML = `
+                    <div class="rank-idx">${userRank}</div>
+                     <div class="rank-user">
+                        <img src="sk1.png" class="rank-avatar">
+                        <span>itZ4wx (Вы)</span>
+                    </div>
+                    <div class="rank-score">${userScore}</div>
+                `;
             }
         }
-    },
+    };
 
-    saveState: () => {
-        // Create a copy to save, injecting balance
-        const saveObj = { ...STATE, balance: SecureStore.getBalance() };
-        const encryptedData = SECURITY.save(saveObj);
-        if (encryptedData) localStorage.setItem('newyear_marathon_save_v4', encryptedData);
-    },
+    // --- App Controller ---
+    // (rankingSystem removed - used one above)
 
-    createSnow: () => {
-        const container = document.getElementById('snowContainer');
-        if (!container) return;
-        for (let i = 0; i < 30; i++) {
-            const flake = document.createElement('div');
-            flake.className = 'snowflake';
-            flake.style.left = Math.random() * 100 + '%';
-            flake.style.animationDuration = Math.random() * 3 + 2 + 's';
-            flake.style.animationDelay = Math.random() * 2 + 's';
-            container.appendChild(flake);
-        }
-    },
 
-    switchScreen: (screenId) => {
-        // Pure UI Switch
-        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
-        const screen = document.getElementById(screenId);
-        if (screen) screen.classList.add('active-screen');
 
-        // Backgrounds
-        document.body.className = '';
-        if (screenId === 'screen-game') document.body.classList.add('bg-starfall');
-        if (screenId === 'screen-roulette') document.body.classList.add('bg-roulette');
-        if (screenId === 'screen-cups-game') document.body.classList.add('bg-cups');
+    const shopManager = {
+        items: [
+            { id: 'trail_fire', name: 'Огненный След', desc: 'Эпический эффект', price: 5000, icon: '🔥', type: 'trail' },
+            { id: 'trail_ice', name: 'Ледяной След', desc: 'Зимняя магия', price: 5000, icon: '❄️', type: 'trail' },
+            { id: 'buff_x2', name: 'Буст x2', desc: 'Удваивает награды (1 час)', price: 2000, icon: '⚡', type: 'buff' },
+            { id: 'lucky_charm', name: 'Талисман', desc: '+10% удачи в рулетке', price: 3000, icon: '🍀', type: 'passive' }
+        ],
 
-    },
-
-    handleHash: () => {
-        const hash = window.location.hash.replace('#', '');
-
-        // Anti-Cheat / Clean up
-        // Fix: Only clear result interval if we are leaving the result screen
-        if (hash !== 'result' && app.resultInterval) { clearInterval(app.resultInterval); app.resultInterval = null; }
-
-        // Check for mid-game exit
-        if (hash !== 'starfall' && starfallGame.isActive) {
-            // Punishment: Set cooldown
-            STATE.games.starfall.lastPlayed = Date.now();
-            starfallGame.isActive = false;
-            app.saveState();
-            // Optionally show toast? No, silent punishment or user figures it out.
-        }
-        if (hash !== 'cups-game' && cupsGame.isActive) {
-            // Punishment: Set cooldown
-            STATE.games.cups._lp = Date.now();
-            STATE.games.cups.hintActive = false;
-            cupsGame.isActive = false;
-            app.saveState();
-        }
-
-        if (hash !== 'starfall') starfallGame.isActive = false;
-        if (hash !== 'cups-game') {
-            cupsGame.isAnimating = false;
-            // cupsGame.isActive = false; // Removed this line to let logic above handle it solely? 
-            // Actually logic above sets it to false if punishment. 
-            // But if we just punish, we also need to ensure it's false for normal nav.
-            // Safe to set false here again or just let the block above handle it.
-            // If we came from cups-game and finished normally, isActive is ALREADY false (set in endGame).
-            // So the block above (hash !== 'cups-game' && cupsGame.isActive) ONLY triggers if we exited mid-game.
-            // So we don't need to force set it false here blindly, or we can to be safe.
-            cupsGame.isActive = false;
-        }
-
-        switch (hash) {
-            case 'loading':
-            case '':
-                app.switchScreen('screen-loading');
-                app.playIntro(); // Trigger animation
-                break;
-            case 'menu':
-                app.updateUI();
-                app.switchScreen('screen-menu');
-                if (app.updateCarousel) {
-                    // Force update after layout (give a small tick for display block to apply)
-                    setTimeout(app.updateCarousel, 50);
+        init: () => {
+            shopManager.render();
+            // Attach event listeners to injected buttons
+            document.getElementById('shop-list').addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-buy');
+                if (btn) {
+                    const id = btn.dataset.id;
+                    shopManager.buy(id);
                 }
-                break;
-            case 'starfall':
-                // If manually typed, we prepare. If via button, tryStartGame checked cooldown.
-                // We can just prepare() here. Logic checks can be added if strict.
-                starfallGame.prepare(); // prepare calls switchScreen('screen-game') - wait, we should just let prepare do it.
-                // Note: prepare() calls app.switchScreen('screen-game'). That's fine.
-                break;
-            case 'roulette':
-                rouletteGame.init();
-                app.switchScreen('screen-roulette');
-                app.updateUI();
-                break;
-            case 'cups':
-                app.switchScreen('screen-cups-intro');
-                break;
-            case 'cups-game':
-                cupsGame.start();
-                break;
+            });
+            document.getElementById('btn-shop-back').addEventListener('click', () => { window.location.hash = 'menu'; });
+        },
 
-            case 'result':
-                app.switchScreen('screen-result');
-                break;
-            default:
-                app.switchScreen('screen-menu');
+        render: () => {
+            const list = document.getElementById('shop-list');
+            const balanceEl = document.getElementById('shop-user-balance');
+            if (balanceEl) balanceEl.innerText = SecureStore.getBalance();
+
+            if (!list) return;
+
+            list.innerHTML = '';
+
+            // Get inventory (mocking it for now or using STATE)
+            const inventory = STATE.inventory || [];
+
+            shopManager.items.forEach(item => {
+                // Check if owned
+                const owned = inventory.includes(item.id);
+                const canAfford = SecureStore.getBalance() >= item.price;
+
+                let btnState = '';
+                let btnText = `${item.price} <img src="zima.png" class="mini-icon">`;
+
+                if (owned) {
+                    btnState = 'sold';
+                    btnText = 'Куплено';
+                } else if (!canAfford) {
+                    btnState = 'locked';
+                    // Text stays price
+                }
+
+                const card = document.createElement('div');
+                card.className = 'shop-item';
+                card.innerHTML = `
+                    <div class="shop-icon">${item.icon}</div>
+                    <div class="shop-info">
+                        <h4>${item.name}</h4>
+                        <p>${item.desc}</p>
+                    </div>
+                    <button class="btn-buy ${btnState}" data-id="${item.id}" ${btnState === 'locked' ? 'disabled' : ''}>
+                        ${btnText}
+                    </button>
+                `;
+                list.appendChild(card);
+            });
+        },
+
+        buy: (id) => {
+            const item = shopManager.items.find(i => i.id === id);
+            if (!item) return;
+
+            const balance = SecureStore.getBalance();
+            if (balance >= item.price) {
+                // Deduct
+                SecureStore.addBalance(-item.price);
+
+                // Add to inventory
+                if (!STATE.inventory) STATE.inventory = [];
+                STATE.inventory.push(id);
+                app.saveState();
+
+                // Re-render
+                shopManager.render();
+                app.updateUI(); // Update other UI parts
+            }
         }
-    },
+    };
 
-    showMenu: () => {
-        window.location.hash = 'menu';
-    },
+    const app = {
+        init: () => {
+            soundManager.init();
+            app.loadState();
+            app.createSnow();
+            app.updateUI();
+            app.startTicks();
+            app.bindEvents();
+            app.initCarousel();
 
-    openRoulette: () => {
-        window.location.hash = 'roulette';
-    },
+            // Initial Route
+            app.handleHash();
+            if (!window.location.hash) {
+                // Default to loading if no hash
+                window.location.hash = 'loading';
+            }
 
-    showRules: (gameId) => {
-        const modal = document.getElementById('modal-rules');
-        const textContainer = document.getElementById('rules-text');
-        if (gameId === 'starfall') {
-            textContainer.innerHTML = `
+            // Preload Images
+            app.preloadAssets();
+            const preloadLose = new Image(); preloadLose.src = 'dedlose.png';
+            const preloadWin = new Image(); preloadWin.src = 'dedpobeda.png';
+
+
+        },
+
+        playIntro: () => {
+            const title = document.querySelector('.main-title');
+            const santa = document.querySelector('.ded-img');
+            const bubble = document.querySelector('.speech-bubble');
+            const btn = document.getElementById('btn-start-adventure');
+
+            // Reset state
+            title.classList.remove('title-enter', 'title-move-up');
+            santa.classList.remove('bounce-in', 'santa-enter');
+            santa.style.opacity = '0';
+            btn.style.opacity = '0';
+            bubble.style.opacity = '0';
+
+            // Sequence
+            // 1. Title appears in center
+            title.classList.add('title-enter');
+
+            // 2. Title moves up after 1.5s
+            setTimeout(() => {
+                title.classList.add('title-move-up');
+
+                // 3. Santa appears
+                setTimeout(() => {
+                    santa.classList.add('santa-enter');
+
+                    // 4. Bubble and Button
+                    setTimeout(() => {
+                        bubble.style.transition = 'opacity 0.5s';
+                        bubble.style.opacity = '1';
+                        btn.style.transition = 'opacity 0.5s';
+                        btn.style.opacity = '1';
+                    }, 800);
+                }, 500);
+            }, 1500);
+        },
+
+        initCarousel: () => {
+            const container = document.querySelector('.games-grid');
+            if (!container) return;
+
+            // State
+            let scrollY = 0; // Visual position (0 = card 0 centered, 1 = card 1 centered)
+            let velocity = 0;
+            let isDragging = false;
+            let startY = 0;
+            let lastY = 0;
+            let lastTime = 0;
+            let targetScrollY = 0; // For snapping
+            let rafId = null;
+
+            const items = Array.from(container.querySelectorAll('.game-card'));
+            const cardHeight = 220; // Virtual height info for spacing calculations
+            const spacing = 140; // Pixels distance between cards visually
+
+            // Animation Loop
+            const update = () => {
+                // Physics
+                if (!isDragging) {
+                    // Inertia & Snapping
+                    velocity *= 0.95; // Friction
+
+                    // Snap to nearest integer if slow enough
+                    if (Math.abs(velocity) < 0.01) {
+                        const snapTarget = Math.round(scrollY);
+                        const diff = snapTarget - scrollY;
+                        scrollY += diff * 0.1; // Smooth snap lerp
+                        velocity = 0;
+                    } else {
+                        scrollY += velocity;
+                    }
+
+                    // Bounds (Rubber band effect or hard clamp?)
+                    // Hard clamp for simplicity + 0.5 buffer
+                    // Bounds (Rubber band effect)
+                    const maxIndex = items.length - 1;
+                    // Clamp velocity if OOB?
+
+                    if (scrollY < -0.2) {
+                        // Smooth bounce back
+                        const force = (-0.0 - scrollY) * 0.1;
+                        velocity += force;
+                        velocity *= 0.8;
+                    }
+                    if (scrollY > maxIndex + 0.2) {
+                        const force = (maxIndex + 0.0 - scrollY) * 0.1;
+                        velocity += force;
+                        velocity *= 0.8;
+                    }
+                }
+
+                // Render
+                items.forEach((item, index) => {
+                    const dist = index - scrollY; // Distance from center (0 = center)
+
+                    // Visual parameters
+                    const scale = Math.max(0.7, 1 - Math.abs(dist) * 0.15);
+                    const opacity = Math.max(0.2, 1 - Math.abs(dist) * 0.4);
+                    // Optimization: Disable blur on mobile or if performance is low
+                    const isMobile = window.innerWidth < 768;
+                    const blur = isMobile ? 0 : Math.min(10, Math.abs(dist) * 5);
+                    const yOffset = dist * spacing;
+                    const zIndex = 100 - Math.round(Math.abs(dist) * 10);
+
+                    // Apply styles
+                    item.style.transform = `translate(-50%, calc(-50% + ${yOffset}px)) scale(${scale})`;
+                    item.style.opacity = opacity;
+                    item.style.filter = `blur(${blur}px)`;
+                    item.style.zIndex = zIndex;
+
+                    // Interaction state
+                    // Only centered item (dist < 0.5) is interactive?
+                    // Or manage pointer-events
+                    if (Math.abs(dist) < 0.5) {
+                        item.style.pointerEvents = 'auto';
+                        item.classList.add('active-card');
+                    } else {
+                        item.style.pointerEvents = 'none'; // Prevent clicking non-centered items (optional)
+                        item.classList.remove('active-card');
+                    }
+                });
+
+                rafId = requestAnimationFrame(update);
+            };
+
+            // Start Loop
+            update();
+
+            // Event Listeners
+            // Touch
+            container.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                startY = e.touches[0].clientY;
+                lastY = startY;
+                velocity = 0;
+                // e.preventDefault(); // Stop page scroll?
+            }, { passive: false });
+
+            container.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault(); // Take control of scroll
+                const y = e.touches[0].clientY;
+                const delta = y - lastY;
+                lastY = y;
+
+                // Move scrollY based on pixels. 
+                // Sensitivity: 1 pixel move = how much index move?
+                // dragging 100px should move 1 index approx?
+                scrollY -= delta / spacing;
+            }, { passive: false });
+
+            container.addEventListener('touchend', (e) => {
+                isDragging = false;
+                // Add velocity throw
+                const now = Date.now();
+                // Simple release, physics loop handles inertia friction
+            });
+
+            // Mouse Wheel
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                // OPTIMIZATION: Fix PC scroll sensitivity
+                // Clamp delta much harder so 1 notch isn't multiple items
+                let d = e.deltaY;
+                if (Math.abs(d) < 5) return; // Ignore microjitters
+
+                // Normalize scroll direction
+                const sign = Math.sign(d);
+
+                // Add a small constant amount per wheel tick instead of using raw delta
+                // This prevents "jumping" 2-3 items
+                velocity += sign * 0.05;
+
+                // Clamp total velocity to prevent runaway scrolling
+                velocity = Math.max(-0.2, Math.min(0.2, velocity));
+
+                // Wake up loop if needed (it runs always currently)
+            }, { passive: false });
+
+            // Expose for external updates (screen switch reset)
+            app.updateCarousel = () => {
+                // Determine which game is selected? Or just reset?
+                // Maybe keep last position?
+                // For now, no-op or re-clamp
+            };
+        },
+
+
+
+        showFloatingText: (text, color) => {
+            const el = document.createElement('div');
+            el.className = 'floating-text';
+            el.innerText = text;
+            el.style.color = color;
+            el.style.left = '50%';
+            el.style.top = '40%';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        },
+
+
+
+        bindEvents: () => {
+            // START BUTTON FIX: Force screen switch even if hash is same
+            const startBtn = document.getElementById('btn-start-adventure');
+            if (startBtn) {
+                startBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log("Start button clicked");
+                    window.location.hash = 'menu';
+                    app.switchScreen('screen-menu'); // Force switch immediately
+                });
+            }
+
+
+            // Tabs
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const target = item.dataset.target;
+                    window.location.hash = target;
+                });
+            });
+
+            // Profile Toggles
+            const soundToggle = document.getElementById('btn-sound-profile-toggle');
+            if (soundToggle) {
+                soundToggle.addEventListener('click', () => {
+                    soundManager.toggleMute();
+                    app.updateProfileUI();
+                });
+            }
+
+            document.getElementById('timer-starfall').addEventListener('click', () => app.tryStartGame('starfall'));
+
+            document.getElementById('timer-roulette').addEventListener('click', () => { window.location.hash = 'roulette'; });
+            document.getElementById('btn-rules-starfall').addEventListener('click', () => app.showRules('starfall'));
+            document.getElementById('btn-close-rules').addEventListener('click', app.closeRules);
+            document.getElementById('btn-result-menu').addEventListener('click', () => { window.location.hash = 'menu'; });
+
+            document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
+            document.getElementById('btn-spin').addEventListener('click', rouletteGame.spin);
+            document.getElementById('btn-roulette-back').addEventListener('click', () => { window.location.hash = 'menu'; });
+
+            // New: Making the whole roulette card click open the game
+            document.getElementById('card-roulette').addEventListener('click', (e) => {
+                // If clicking button inside, don't double trigger
+                if (e.target.closest('#timer-roulette') || e.target.closest('.card-actions')) return;
+                window.location.hash = 'roulette';
+            });
+
+            // Shop Card Click
+            const shopCard = document.getElementById('card-shop');
+            if (shopCard) {
+                shopCard.addEventListener('click', () => { window.location.hash = 'shop'; });
+            }
+
+
+
+            // Hash Change Listener (The Router)
+            window.addEventListener('hashchange', app.handleHash);
+
+            document.getElementById('btn-claim-reward').addEventListener('click', app.claimReward);
+            document.getElementById('btn-sell-reward').addEventListener('click', app.sellReward);
+
+
+
+            // Result Screen Next Level
+            document.getElementById('btn-next-level').addEventListener('click', (e) => {
+                const btn = e.target; // or use currentTarget
+                if (btn.dataset.locked === "true") return; // Block click if locked
+
+                // Determine which game we are in?
+                // Currently only Cups uses this logic based on request
+                app.switchScreen('screen-game-loader');
+                setTimeout(() => {
+                    cupsGame.start();
+                }, 2000);
+            });
+
+            // Cups Events
+            document.getElementById('btn-cups-hint').addEventListener('click', cupsGame.useHint);
+            document.getElementById('timer-cups').addEventListener('click', () => app.tryStartGame('cups'));
+            document.getElementById('btn-rules-cups').addEventListener('click', () => app.showRules('cups'));
+            document.getElementById('btn-start-cups').addEventListener('click', () => {
+                app.switchScreen('screen-game-loader');
+                // Optional: Customize loader text
+                const tip = document.getElementById('game-tip');
+                if (tip) tip.innerText = "Совет: Следи за стаканчиком очень внимательно!";
+
+                // setTimeout(() => {
+                //     cupsGame.start();
+                // }, 2000);
+                window.location.hash = 'cups-game';
+            });
+            document.getElementById('btn-cups-back').addEventListener('click', () => { window.location.hash = 'menu'; });
+
+            window.addEventListener('resize', () => {
+                if (document.getElementById('screen-game').classList.contains('active-screen')) starfallGame.resize();
+                app.updateNavIndicator();
+            });
+
+            // Initial call
+            setTimeout(app.updateNavIndicator, 100);
+        },
+
+        loadState: () => {
+            const saved = localStorage.getItem('newyear_marathon_save_v4');
+            if (saved) {
+                const parsed = SECURITY.load(saved);
+                if (parsed) {
+                    if (parsed.balance !== undefined) SecureStore.setBalance(parsed.balance);
+                    STATE.cookies = parsed.cookies || 0;
+                    STATE.inventory = parsed.inventory || [];
+                    if (parsed.games) {
+                        if (parsed.games.starfall) {
+                            STATE.games.starfall = { ...STATE.games.starfall, ...parsed.games.starfall };
+                        }
+                        if (parsed.games.roulette) {
+                            STATE.games.roulette = { ...STATE.games.roulette, ...parsed.games.roulette };
+                        }
+                        if (parsed.games.cups) {
+                            STATE.games.cups = { ...STATE.games.cups, ...parsed.games.cups };
+                        }
+                    }
+                    STATE.totalSnowflakes = parsed.totalSnowflakes || SecureStore.getBalance(); // Back compat
+                }
+            }
+        },
+
+        saveState: () => {
+            // Create a copy to save, injecting balance
+            const saveObj = { ...STATE, balance: SecureStore.getBalance() };
+            const encryptedData = SECURITY.save(saveObj);
+            if (encryptedData) localStorage.setItem('newyear_marathon_save_v4', encryptedData);
+        },
+
+        createSnow: () => {
+            const container = document.getElementById('snowContainer');
+            if (!container) return;
+            for (let i = 0; i < 30; i++) {
+                const flake = document.createElement('div');
+                flake.className = 'snowflake';
+                flake.style.left = Math.random() * 100 + '%';
+                flake.style.animationDuration = Math.random() * 3 + 2 + 's';
+                flake.style.animationDelay = Math.random() * 2 + 's';
+                container.appendChild(flake);
+            }
+        },
+
+        switchScreen: (screenId) => {
+            // Pure UI Switch
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active-screen'));
+            const screen = document.getElementById(screenId);
+            if (screen) screen.classList.add('active-screen');
+
+            // Backgrounds
+            document.body.className = '';
+            if (screenId === 'screen-game') document.body.classList.add('bg-starfall');
+            if (screenId === 'screen-roulette') document.body.classList.add('bg-roulette');
+            if (screenId === 'screen-cups-game') document.body.classList.add('bg-cups');
+
+            // New Section Backgrounds
+            if (screenId === 'screen-menu') document.body.classList.add('bg-menu');
+            if (screenId === 'screen-profile') document.body.classList.add('bg-profile');
+            if (screenId === 'screen-ranking') document.body.classList.add('bg-ranking');
+            if (screenId === 'screen-shop') document.body.classList.add('bg-shop');
+
+            // Nav Visibility
+            const nav = document.getElementById('bottom-nav');
+            if (nav) {
+                if (screenId === 'screen-menu' || screenId === 'screen-profile' || screenId === 'screen-ranking' || screenId === 'screen-shop') {
+                    nav.style.display = 'flex';
+                } else {
+                    nav.style.display = 'none';
+                }
+            }
+            // Active Tab formatting
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            let activeTarget = 'menu';
+            if (screenId === 'screen-profile') activeTarget = 'profile';
+            if (screenId === 'screen-ranking') activeTarget = 'ranking';
+            const activeNav = document.querySelector(`.nav-item[data-target="${activeTarget}"]`);
+            if (activeNav) activeNav.classList.add('active');
+
+            // Update Indicator
+            setTimeout(app.updateNavIndicator, 50); // Small delay for layout
+
+        },
+
+        handleHash: () => {
+            const hash = window.location.hash.replace('#', '');
+
+            // Anti-Cheat / Clean up
+            // Fix: Only clear result interval if we are leaving the result screen
+            if (hash !== 'result' && app.resultInterval) { clearInterval(app.resultInterval); app.resultInterval = null; }
+
+            // Check for mid-game exit
+            if (hash !== 'starfall' && starfallGame.isActive) {
+                // Punishment: Set cooldown
+                STATE.games.starfall.lastPlayed = Date.now();
+                starfallGame.isActive = false;
+                app.saveState();
+                // Optionally show toast? No, silent punishment or user figures it out.
+            }
+            if (hash !== 'cups-game' && cupsGame.isActive) {
+                // Punishment: Set cooldown
+                STATE.games.cups._lp = Date.now();
+                STATE.games.cups.hintActive = false;
+                cupsGame.isActive = false;
+                app.saveState();
+            }
+
+            if (hash !== 'starfall') starfallGame.isActive = false;
+            if (hash !== 'cups-game') {
+                cupsGame.isAnimating = false;
+                // cupsGame.isActive = false; // Removed this line to let logic above handle it solely? 
+                // Actually logic above sets it to false if punishment. 
+                // But if we just punish, we also need to ensure it's false for normal nav.
+                // Safe to set false here again or just let the block above handle it.
+                // If we came from cups-game and finished normally, isActive is ALREADY false (set in endGame).
+                // So the block above (hash !== 'cups-game' && cupsGame.isActive) ONLY triggers if we exited mid-game.
+                // So we don't need to force set it false here blindly, or we can to be safe.
+                cupsGame.isActive = false;
+            }
+
+            switch (hash) {
+                case 'loading':
+                case '':
+                    app.switchScreen('screen-loading');
+                    app.playIntro(); // Trigger animation
+                    break;
+                case 'menu':
+                    app.updateUI();
+                    app.switchScreen('screen-menu');
+                    if (app.updateCarousel) setTimeout(app.updateCarousel, 50);
+                    break;
+                case 'profile':
+                    app.updateProfileUI(); // New function needed
+                    app.switchScreen('screen-profile');
+                    break;
+                case 'ranking':
+                    rankingSystem.updateLeaderboard();
+                    app.switchScreen('screen-ranking');
+                    break;
+                case 'shop':
+                    shopManager.render();
+                    app.switchScreen('screen-shop');
+                    break;
+                case 'starfall':
+                    if (app.updateCarousel) {
+                        // Force update after layout (give a small tick for display block to apply)
+                        setTimeout(app.updateCarousel, 50);
+                    }
+                    break;
+                case 'starfall':
+                    // If manually typed, we prepare. If via button, tryStartGame checked cooldown.
+                    // We can just prepare() here. Logic checks can be added if strict.
+                    starfallGame.prepare(); // prepare calls switchScreen('screen-game') - wait, we should just let prepare do it.
+                    // Note: prepare() calls app.switchScreen('screen-game'). That's fine.
+                    break;
+                case 'roulette':
+                    rouletteGame.init();
+                    app.switchScreen('screen-roulette');
+                    app.updateUI();
+                    break;
+                case 'cups':
+                    app.switchScreen('screen-cups-intro');
+                    break;
+                case 'cups-game':
+                    cupsGame.start();
+                    break;
+
+                case 'result':
+                    app.switchScreen('screen-result');
+                    break;
+                default:
+                    app.switchScreen('screen-menu');
+            }
+        },
+
+        showMenu: () => {
+            window.location.hash = 'menu';
+        },
+
+        openRoulette: () => {
+            window.location.hash = 'roulette';
+        },
+
+        showRules: (gameId) => {
+            const modal = document.getElementById('modal-rules');
+            const textContainer = document.getElementById('rules-text');
+            if (gameId === 'starfall') {
+                textContainer.innerHTML = `
                     <ol>
                         <li><b>Цель:</b> Собери звезды в носок. Чем выше уровень, тем больше нужно звезд!</li>
                         <li><b>Управление:</b> Перемещай носок по экрану.</li>
@@ -1643,337 +1922,337 @@ const app = {
                         <li><b>Победа:</b> Набери нужное количество очков до истечения времени.</li>
                     </ol>
                 `;
-        }
-        if (gameId === 'cups') {
-            textContainer.innerHTML = `
+            }
+            if (gameId === 'cups') {
+                textContainer.innerHTML = `
                     <ol>
                         <li><b>Цель:</b> Угадай, под каким стаканчиком спрятан предмет.</li>
                         <li><b>Уровни:</b> 12 уровней, с каждым уровнем стаканчики перемешиваются быстрее.</li>
                         <li><b>Награды:</b> Угадай 1, 2 или 3 раза за игру чтобы получить снежинки!</li>
                     </ol>
                  `;
-        }
-        modal.classList.add('active');
-    },
-
-    closeRules: () => {
-        document.getElementById('modal-rules').classList.remove('active');
-    },
-
-    updateUI: () => {
-        document.getElementById('user-balance').innerText = SecureStore.getBalance();
-
-        // Starfall Timer
-        const starBtn = document.getElementById('timer-starfall');
-        const starDiff = Date.now() - STATE.games.starfall.lastPlayed;
-        const currentCooldown = CONFIG.starfall.baseCooldown + (STATE.games.starfall.level - 1) * CONFIG.starfall.cooldownStep;
-        const starRem = currentCooldown - starDiff;
-
-        // Update Menu Level Badge
-        const levelBadge = document.getElementById('menu-starfall-level');
-        if (levelBadge) levelBadge.innerText = STATE.games.starfall.level;
-
-        if (starRem > 0) {
-            starBtn.classList.add('cooldown');
-            // text updated by tick
-        } else {
-            starBtn.classList.remove('cooldown');
-            starBtn.innerText = 'ИГРАТЬ';
-        }
-
-        // Cups Timer
-        const cupsBtn = document.getElementById('timer-cups');
-        if (cupsBtn) {
-            const cupsDiff = Date.now() - STATE.games.cups._lp;
-            let cupsCooldown = CONFIG.cups.baseCooldown;
-            if (STATE.games.cups.level >= 3) {
-                cupsCooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
             }
-            const cupsRem = cupsCooldown - cupsDiff;
+            modal.classList.add('active');
+        },
 
-            const cupsLvlBadge = document.getElementById('menu-cups-level');
-            if (cupsLvlBadge) cupsLvlBadge.innerText = STATE.games.cups.level;
+        closeRules: () => {
+            document.getElementById('modal-rules').classList.remove('active');
+        },
 
-            if (cupsRem > 0) {
-                cupsBtn.classList.add('cooldown');
-            } else {
-                cupsBtn.classList.remove('cooldown');
-                cupsBtn.innerText = 'ИГРАТЬ';
-            }
-        }
+        updateUI: () => {
+            document.getElementById('user-balance').innerText = SecureStore.getBalance();
 
-        // Roulette Timer
-        const rouBtn = document.getElementById('btn-spin');
-        const rouTimer = document.getElementById('roulette-timer-display');
-        const rouRem = STATE.games.roulette._nfs - Date.now();
-        const hasExtra = STATE.games.roulette._es > 0;
-
-        if (hasExtra) {
-            rouBtn.style.display = 'inline-block';
-            rouTimer.style.display = 'none';
-            rouBtn.innerText = `КРУТИТЬ (${STATE.games.roulette._es})`;
-            rouBtn.classList.remove('cooldown');
-            // Use Gold Style
-            rouBtn.classList.remove('btn-glass-action');
-            rouBtn.classList.add('btn-gold-action');
-        } else if (rouRem > 0) {
-            rouBtn.style.display = 'none';
-            rouTimer.style.display = 'block';
-            const h = Math.floor(rouRem / 3600000);
-            const m = Math.floor((rouRem % 3600000) / 60000);
-            const s = Math.floor((rouRem % 60000) / 1000);
-            rouTimer.innerHTML = `До следующей крутки:<br><span style="display:block; text-align:center; font-size: 1.2rem; margin-top: 5px;">${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}</span>`; // Centered second line
-
-            // Update Menu Button too
-            document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-        } else {
-            rouBtn.style.display = 'inline-block';
-            rouTimer.style.display = 'none';
-            rouBtn.innerText = 'КРУТИТЬ БЕСПЛАТНО';
-            rouBtn.classList.remove('cooldown');
-            // Use Gold Style
-            rouBtn.classList.remove('btn-glass-action');
-            rouBtn.classList.add('btn-gold-action');
-
-            document.getElementById('timer-roulette').innerText = 'КРУТИТЬ';
-        }
-    },
-
-    startTicks: () => {
-        setInterval(() => {
-            const now = Date.now();
-
-            // Countdown to New Year - REMOVED per request
-            /*
-            // Countdown logic...
-            */
-
-            // Starfall
+            // Starfall Timer
+            const starBtn = document.getElementById('timer-starfall');
+            const starDiff = Date.now() - STATE.games.starfall.lastPlayed;
             const currentCooldown = CONFIG.starfall.baseCooldown + (STATE.games.starfall.level - 1) * CONFIG.starfall.cooldownStep;
-            const sRem = currentCooldown - (now - STATE.games.starfall.lastPlayed);
-            if (sRem > 0) {
-                const m = Math.floor(sRem / 60000);
-                const s = Math.floor((sRem % 60000) / 1000);
-                const el = document.getElementById('timer-starfall');
-                if (el) el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+            const starRem = currentCooldown - starDiff;
+
+            // Update Menu Level Badge
+            const levelBadge = document.getElementById('menu-starfall-level');
+            if (levelBadge) levelBadge.innerText = STATE.games.starfall.level;
+
+            if (starRem > 0) {
+                starBtn.classList.add('cooldown');
+                // text updated by tick
             } else {
-                const el = document.getElementById('timer-starfall');
-                if (el && el.innerText.includes(':')) app.updateUI();
+                starBtn.classList.remove('cooldown');
+                starBtn.innerText = 'ИГРАТЬ';
             }
 
             // Cups Timer
-            let cupsCooldown = CONFIG.cups.baseCooldown;
-            if (STATE.games.cups.level >= 3) {
-                cupsCooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
-            }
-            const cRem = cupsCooldown - (now - STATE.games.cups._lp);
-            if (cRem > 0) {
-                const m = Math.floor(cRem / 60000);
-                const s = Math.floor((cRem % 60000) / 1000);
-                const el = document.getElementById('timer-cups');
-                if (el) el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-            } else {
-                const el = document.getElementById('timer-cups');
-                if (el && el.innerText.includes(':')) app.updateUI();
-            }
+            const cupsBtn = document.getElementById('timer-cups');
+            if (cupsBtn) {
+                const cupsDiff = Date.now() - STATE.games.cups._lp;
+                let cupsCooldown = CONFIG.cups.baseCooldown;
+                if (STATE.games.cups.level >= 3) {
+                    cupsCooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
+                }
+                const cupsRem = cupsCooldown - cupsDiff;
 
-            // Roulette
-            if (STATE.games.roulette._es === 0) {
-                const rRem = STATE.games.roulette._nfs - now;
-                if (rRem > 0) {
-                    // Update in-game timer
-                    const h = Math.floor(rRem / 3600000);
-                    const m = Math.floor((rRem % 3600000) / 60000);
-                    const s = Math.floor((rRem % 60000) / 1000);
-                    const display = document.getElementById('roulette-timer-display');
-                    if (display) display.innerHTML = `До следующей крутки:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                const cupsLvlBadge = document.getElementById('menu-cups-level');
+                if (cupsLvlBadge) cupsLvlBadge.innerText = STATE.games.cups.level;
 
-                    // Update Menu Button
-                    const el = document.getElementById('timer-roulette');
-                    if (el) el.innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                if (cupsRem > 0) {
+                    cupsBtn.classList.add('cooldown');
                 } else {
-                    // Check if we need to show button
-                    const btn = document.getElementById('btn-spin');
-                    if (btn && btn.style.display === 'none') app.updateUI();
+                    cupsBtn.classList.remove('cooldown');
+                    cupsBtn.innerText = 'ИГРАТЬ';
                 }
             }
-        }, 1000);
-    },
 
-    tryStartGame: (gameId) => {
-        const now = Date.now();
-        if (gameId === 'starfall') {
-            const currentCooldown = CONFIG.starfall.baseCooldown + (STATE.games.starfall.level - 1) * CONFIG.starfall.cooldownStep;
-            if (now - STATE.games.starfall.lastPlayed < currentCooldown) return;
-            window.location.hash = 'starfall';
-            // app.switchScreen('screen-game-loader'); // Skipping loader for URL nav, or add hash for loader
-            // setTimeout(() => starfallGame.prepare(), 2000); 
-            // Simplified: Direct go
-        }
-        if (gameId === 'cups') {
-            let cooldown = CONFIG.cups.baseCooldown;
-            if (STATE.games.cups.level >= 3) cooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
-            if (now - STATE.games.cups._lp < cooldown) return;
-            window.location.hash = 'cups';
-        }
-    },
+            // Roulette Timer
+            const rouBtn = document.getElementById('btn-spin');
+            const rouTimer = document.getElementById('roulette-timer-display');
+            const rouRem = STATE.games.roulette._nfs - Date.now();
+            const hasExtra = STATE.games.roulette._es > 0;
 
-    finishGame: (gameId, score, win) => {
-        const resultTitle = document.getElementById('result-title');
-        const resultImg = document.getElementById('result-ded-img');
-        const resultMsg = document.getElementById('result-message');
-        const rewardBox = document.getElementById('reward-box');
+            if (hasExtra) {
+                rouBtn.style.display = 'inline-block';
+                rouTimer.style.display = 'none';
+                rouBtn.innerText = `КРУТИТЬ (${STATE.games.roulette._es})`;
+                rouBtn.classList.remove('cooldown');
+                // Use Gold Style
+                rouBtn.classList.remove('btn-glass-action');
+                rouBtn.classList.add('btn-gold-action');
+            } else if (rouRem > 0) {
+                rouBtn.style.display = 'none';
+                rouTimer.style.display = 'block';
+                const h = Math.floor(rouRem / 3600000);
+                const m = Math.floor((rouRem % 3600000) / 60000);
+                const s = Math.floor((rouRem % 60000) / 1000);
+                rouTimer.innerHTML = `До следующей крутки:<br><span style="display:block; text-align:center; font-size: 1.2rem; margin-top: 5px;">${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}</span>`; // Centered second line
 
-        if (win) {
-            const level = STATE.games[gameId].level;
-            // Reward Logic
-            let reward = CONFIG[gameId].baseReward + (level - 1) * CONFIG[gameId].levelRewardStep;
-
-            // Super Powerup Override
-            if (gameId === 'starfall' && arguments[3] === true) { // arguments[3] is wasBuff
-                reward = 500;
-            }
-
-            SecureStore.addBalance(reward);
-            if (gameId === 'starfall') STATE.games[gameId].lastPlayed = Date.now(); // Keep normal for starfall
-            if (gameId === 'cups') STATE.games.cups._lp = Date.now(); // Obfuscated
-            if (gameId === 'roulette') STATE.games.roulette._lp = Date.now(); // Obfuscated
-
-            // Max level 12 logic
-            if (STATE.games[gameId].level >= 12) {
-                STATE.games[gameId].level = 1;
+                // Update Menu Button too
+                document.getElementById('timer-roulette').innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
             } else {
-                STATE.games[gameId].level++;
+                rouBtn.style.display = 'inline-block';
+                rouTimer.style.display = 'none';
+                rouBtn.innerText = 'КРУТИТЬ БЕСПЛАТНО';
+                rouBtn.classList.remove('cooldown');
+                // Use Gold Style
+                rouBtn.classList.remove('btn-glass-action');
+                rouBtn.classList.add('btn-gold-action');
+
+                document.getElementById('timer-roulette').innerText = 'КРУТИТЬ';
             }
+        },
 
-            resultTitle.innerText = "Победа!";
-            // Ensure image is correct immediately, even if previous was lose
-            resultImg.src = "dedpobeda.png";
-            resultMsg.innerText = `Уровень ${STATE.games[gameId].level} открыт!`;
-            rewardBox.innerHTML = `<span>+${reward}</span> <img src="zima.png" class="currency-icon">`;
-            rewardBox.style.display = "inline-flex";
-        } else {
-            if (gameId === 'starfall') STATE.games[gameId].lastPlayed = Date.now();
-            if (gameId === 'cups') STATE.games.cups._lp = Date.now();
-            if (gameId === 'roulette') STATE.games.roulette._lp = Date.now();
-            resultTitle.innerText = "Ох-ох...";
-            resultImg.src = "dedlose.png";
-            resultMsg.innerText = "Не сдавайся! Попробуй еще раз.";
-            rewardBox.style.display = "none";
-        }
-        app.saveState();
+        startTicks: () => {
+            setInterval(() => {
+                const now = Date.now();
 
-        // Starfall: Always hide next level button (handled by menu/cooldown)
-        document.getElementById('btn-next-level').style.display = 'none';
+                // Countdown to New Year - REMOVED per request
+                /*
+                // Countdown logic...
+                */
 
-        window.location.hash = 'result';
-    },
+                // Starfall
+                const currentCooldown = CONFIG.starfall.baseCooldown + (STATE.games.starfall.level - 1) * CONFIG.starfall.cooldownStep;
+                const sRem = currentCooldown - (now - STATE.games.starfall.lastPlayed);
+                if (sRem > 0) {
+                    const m = Math.floor(sRem / 60000);
+                    const s = Math.floor((sRem % 60000) / 1000);
+                    const el = document.getElementById('timer-starfall');
+                    if (el) el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                } else {
+                    const el = document.getElementById('timer-starfall');
+                    if (el && el.innerText.includes(':')) app.updateUI();
+                }
 
-    finishCupGame: (correctGuesses, reward) => {
-        const resultTitle = document.getElementById('result-title');
-        const resultImg = document.getElementById('result-ded-img');
-        const resultMsg = document.getElementById('result-message');
-        const rewardBox = document.getElementById('reward-box');
+                // Cups Timer
+                let cupsCooldown = CONFIG.cups.baseCooldown;
+                if (STATE.games.cups.level >= 3) {
+                    cupsCooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
+                }
+                const cRem = cupsCooldown - (now - STATE.games.cups._lp);
+                if (cRem > 0) {
+                    const m = Math.floor(cRem / 60000);
+                    const s = Math.floor((cRem % 60000) / 1000);
+                    const el = document.getElementById('timer-cups');
+                    if (el) el.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+                } else {
+                    const el = document.getElementById('timer-cups');
+                    if (el && el.innerText.includes(':')) app.updateUI();
+                }
 
-        if (correctGuesses >= 1) {
-            // Win
-            resultTitle.innerText = "Хорошая работа!";
-            resultImg.src = "dedpobeda.png";
-            resultMsg.innerText = `Ты угадал ${correctGuesses} из 3!`;
-            rewardBox.innerHTML = `<span>+${reward}</span> <img src="zima.png" class="currency-icon">`;
-            rewardBox.style.display = "inline-flex";
+                // Roulette
+                if (STATE.games.roulette._es === 0) {
+                    const rRem = STATE.games.roulette._nfs - now;
+                    if (rRem > 0) {
+                        // Update in-game timer
+                        const h = Math.floor(rRem / 3600000);
+                        const m = Math.floor((rRem % 3600000) / 60000);
+                        const s = Math.floor((rRem % 60000) / 1000);
+                        const display = document.getElementById('roulette-timer-display');
+                        if (display) display.innerHTML = `До следующей крутки:<br>${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
 
-            // Allow Next Level
-            document.getElementById('btn-next-level').style.display = 'inline-block';
-        } else {
-            // Lose
-            resultTitle.innerText = "Эх...";
-            resultImg.src = "dedlose.png";
-            resultMsg.innerText = "Попробуй позже, может повезет больше!";
-            rewardBox.style.display = "none";
+                        // Update Menu Button
+                        const el = document.getElementById('timer-roulette');
+                        if (el) el.innerText = `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                    } else {
+                        // Check if we need to show button
+                        const btn = document.getElementById('btn-spin');
+                        if (btn && btn.style.display === 'none') app.updateUI();
+                    }
+                }
+            }, 1000);
+        },
 
+        tryStartGame: (gameId) => {
+            const now = Date.now();
+            if (gameId === 'starfall') {
+                const currentCooldown = CONFIG.starfall.baseCooldown + (STATE.games.starfall.level - 1) * CONFIG.starfall.cooldownStep;
+                if (now - STATE.games.starfall.lastPlayed < currentCooldown) return;
+                window.location.hash = 'starfall';
+                // app.switchScreen('screen-game-loader'); // Skipping loader for URL nav, or add hash for loader
+                // setTimeout(() => starfallGame.prepare(), 2000); 
+                // Simplified: Direct go
+            }
+            if (gameId === 'cups') {
+                let cooldown = CONFIG.cups.baseCooldown;
+                if (STATE.games.cups.level >= 3) cooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
+                if (now - STATE.games.cups._lp < cooldown) return;
+                window.location.hash = 'cups';
+            }
+        },
+
+        finishGame: (gameId, score, win) => {
+            const resultTitle = document.getElementById('result-title');
+            const resultImg = document.getElementById('result-ded-img');
+            const resultMsg = document.getElementById('result-message');
+            const rewardBox = document.getElementById('reward-box');
+
+            if (win) {
+                const level = STATE.games[gameId].level;
+                // Reward Logic
+                let reward = CONFIG[gameId].baseReward + (level - 1) * CONFIG[gameId].levelRewardStep;
+
+                // Super Powerup Override
+                if (gameId === 'starfall' && arguments[3] === true) { // arguments[3] is wasBuff
+                    reward = 500;
+                }
+
+                SecureStore.addBalance(reward);
+                if (gameId === 'starfall') STATE.games[gameId].lastPlayed = Date.now(); // Keep normal for starfall
+                if (gameId === 'cups') STATE.games.cups._lp = Date.now(); // Obfuscated
+                if (gameId === 'roulette') STATE.games.roulette._lp = Date.now(); // Obfuscated
+
+                // Max level 12 logic
+                if (STATE.games[gameId].level >= 12) {
+                    STATE.games[gameId].level = 1;
+                } else {
+                    STATE.games[gameId].level++;
+                }
+
+                resultTitle.innerText = "Победа!";
+                // Ensure image is correct immediately, even if previous was lose
+                resultImg.src = "dedpobeda.png";
+                resultMsg.innerText = `Уровень ${STATE.games[gameId].level} открыт!`;
+                rewardBox.innerHTML = `<span>+${reward}</span> <img src="zima.png" class="currency-icon">`;
+                rewardBox.style.display = "inline-flex";
+            } else {
+                if (gameId === 'starfall') STATE.games[gameId].lastPlayed = Date.now();
+                if (gameId === 'cups') STATE.games.cups._lp = Date.now();
+                if (gameId === 'roulette') STATE.games.roulette._lp = Date.now();
+                resultTitle.innerText = "Ох-ох...";
+                resultImg.src = "dedlose.png";
+                resultMsg.innerText = "Не сдавайся! Попробуй еще раз.";
+                rewardBox.style.display = "none";
+            }
+            app.saveState();
+
+            // Starfall: Always hide next level button (handled by menu/cooldown)
             document.getElementById('btn-next-level').style.display = 'none';
-        }
 
-        // If Next Level is allowed (Win), we should show "To next level: Ready" or just the button.
-        // Since we removed cooldown for win, we show button.
-        // The user asked: "Instead of 'next level' button make a button 'To next level: and timer'"
-        // BUT also said "Fix bug... can't propose next round because CD is running".
-        // So by removing CD, we solve the "can't play" issue.
-        // The button "To next level: timer" is only needed if there IS a timer.
-        // If I remove the timer for winners, I can just keep the "Next Level" button as is, 
-        // maybe rename it to "Следующий уровень" (it is already named that in HTML).
-        // I will assume standard "Next Level" button is fine if it works.
+            window.location.hash = 'result';
+        },
 
-        // Handle Next Level Button with Timer
-        if (correctGuesses >= 1) {
-            const btn = document.getElementById('btn-next-level');
-            btn.style.display = 'inline-block';
-            btn.classList.add('cooldown');
+        finishCupGame: (correctGuesses, reward) => {
+            const resultTitle = document.getElementById('result-title');
+            const resultImg = document.getElementById('result-ded-img');
+            const resultMsg = document.getElementById('result-message');
+            const rewardBox = document.getElementById('reward-box');
 
-            // Calculate wait time
-            let cooldown = CONFIG.cups.baseCooldown;
-            if (STATE.games.cups.level >= 3) cooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
+            if (correctGuesses >= 1) {
+                // Win
+                resultTitle.innerText = "Хорошая работа!";
+                resultImg.src = "dedpobeda.png";
+                resultMsg.innerText = `Ты угадал ${correctGuesses} из 3!`;
+                rewardBox.innerHTML = `<span>+${reward}</span> <img src="zima.png" class="currency-icon">`;
+                rewardBox.style.display = "inline-flex";
 
-            const updateBtn = () => {
-                const diff = Date.now() - STATE.games.cups._lp;
-                const rem = cooldown - diff;
+                // Allow Next Level
+                document.getElementById('btn-next-level').style.display = 'inline-block';
+            } else {
+                // Lose
+                resultTitle.innerText = "Эх...";
+                resultImg.src = "dedlose.png";
+                resultMsg.innerText = "Попробуй позже, может повезет больше!";
+                rewardBox.style.display = "none";
 
-                if (rem <= 0) {
-                    btn.innerText = "Следующий Уровень >>>";
-                    btn.classList.remove('cooldown');
-                    btn.dataset.locked = "false";
-                    if (app.resultInterval) clearInterval(app.resultInterval);
-                } else {
-                    const m = Math.floor(rem / 60000);
-                    const s = Math.floor((rem % 60000) / 1000);
-                    btn.innerText = `До след. уровня: ${m}:${s < 10 ? '0' : ''}${s}`;
-                    btn.dataset.locked = "true";
-                }
-            };
+                document.getElementById('btn-next-level').style.display = 'none';
+            }
 
-            btn.dataset.locked = "true";
-            updateBtn();
+            // If Next Level is allowed (Win), we should show "To next level: Ready" or just the button.
+            // Since we removed cooldown for win, we show button.
+            // The user asked: "Instead of 'next level' button make a button 'To next level: and timer'"
+            // BUT also said "Fix bug... can't propose next round because CD is running".
+            // So by removing CD, we solve the "can't play" issue.
+            // The button "To next level: timer" is only needed if there IS a timer.
+            // If I remove the timer for winners, I can just keep the "Next Level" button as is, 
+            // maybe rename it to "Следующий уровень" (it is already named that in HTML).
+            // I will assume standard "Next Level" button is fine if it works.
 
-            if (app.resultInterval) clearInterval(app.resultInterval);
-            app.resultInterval = setInterval(updateBtn, 1000);
+            // Handle Next Level Button with Timer
+            if (correctGuesses >= 1) {
+                const btn = document.getElementById('btn-next-level');
+                btn.style.display = 'inline-block';
+                btn.classList.add('cooldown');
 
-            // Override click behavior for this button? 
-            // The existing listener handles switchScreen.
-            // We need to prevent it if locked.
-        }
+                // Calculate wait time
+                let cooldown = CONFIG.cups.baseCooldown;
+                if (STATE.games.cups.level >= 3) cooldown += (STATE.games.cups.level - 2) * CONFIG.cups.cooldownPerLevel;
 
-        window.location.hash = 'result';
-    },
+                const updateBtn = () => {
+                    const diff = Date.now() - STATE.games.cups._lp;
+                    const rem = cooldown - diff;
 
-    // Roulette Result Handling
-    currentReward: null,
-    showRouletteReward: (reward) => {
-        app.currentReward = reward;
-        const modal = document.getElementById('modal-roulette-reward');
-        const display = document.getElementById('roulette-reward-display');
-        const sellBtn = document.getElementById('btn-sell-reward');
-        const modalTitle = modal.querySelector('h3');
+                    if (rem <= 0) {
+                        btn.innerText = "Следующий Уровень >>>";
+                        btn.classList.remove('cooldown');
+                        btn.dataset.locked = "false";
+                        if (app.resultInterval) clearInterval(app.resultInterval);
+                    } else {
+                        const m = Math.floor(rem / 60000);
+                        const s = Math.floor((rem % 60000) / 1000);
+                        btn.innerText = `До след. уровня: ${m}:${s < 10 ? '0' : ''}${s}`;
+                        btn.dataset.locked = "true";
+                    }
+                };
 
-        // Modern, Clean UI - No Ded Moroz Image
-        let bgClass = 'bg-reward-common';
-        let titleText = "Поздравляем!";
+                btn.dataset.locked = "true";
+                updateBtn();
 
-        if (reward.type === 'junk') {
-            titleText = "Эх...";
-        } else if (reward.id === 'boost') {
-            titleText = "ВОЛШЕБСТВО!";
-        } else if (reward.val >= 500 || reward.type === 'extra_spin') {
-            titleText = "СУПЕР ПРИЗ!";
-        }
+                if (app.resultInterval) clearInterval(app.resultInterval);
+                app.resultInterval = setInterval(updateBtn, 1000);
 
-        modalTitle.innerText = titleText;
+                // Override click behavior for this button? 
+                // The existing listener handles switchScreen.
+                // We need to prevent it if locked.
+            }
 
-        // Premium HTML Structure
-        let desc = reward.type === 'junk' ? 'Ничего, повезет в любви!' : 'Отличный улов!';
-        if (reward.id === 'boost') desc = "В игре 'Звездопад' вы будете получать 500 снежинок за победу!";
+            window.location.hash = 'result';
+        },
 
-        display.innerHTML = `
+        // Roulette Result Handling
+        currentReward: null,
+        showRouletteReward: (reward) => {
+            app.currentReward = reward;
+            const modal = document.getElementById('modal-roulette-reward');
+            const display = document.getElementById('roulette-reward-display');
+            const sellBtn = document.getElementById('btn-sell-reward');
+            const modalTitle = modal.querySelector('h3');
+
+            // Modern, Clean UI - No Ded Moroz Image
+            let bgClass = 'bg-reward-common';
+            let titleText = "Поздравляем!";
+
+            if (reward.type === 'junk') {
+                titleText = "Эх...";
+            } else if (reward.id === 'boost') {
+                titleText = "ВОЛШЕБСТВО!";
+            } else if (reward.val >= 500 || reward.type === 'extra_spin') {
+                titleText = "СУПЕР ПРИЗ!";
+            }
+
+            modalTitle.innerText = titleText;
+
+            // Premium HTML Structure
+            let desc = reward.type === 'junk' ? 'Ничего, повезет в любви!' : 'Отличный улов!';
+            if (reward.id === 'boost') desc = "В игре 'Звездопад' вы будете получать 500 снежинок за победу!";
+
+            display.innerHTML = `
                 <div class="prize-glow-container">
                     <div class="prize-rays"></div>
                     <div class="prize-halo"></div>
@@ -1984,54 +2263,97 @@ const app = {
                 <p class="premium-reward-desc">${desc}</p>
             `;
 
-        if (reward.sell > 0) {
-            sellBtn.style.display = 'inline-block';
-            document.getElementById('sell-price').innerText = reward.sell;
-        } else {
-            sellBtn.style.display = 'none';
-        }
+            if (reward.sell > 0) {
+                sellBtn.style.display = 'inline-block';
+                document.getElementById('sell-price').innerText = reward.sell;
+            } else {
+                sellBtn.style.display = 'none';
+            }
 
-        modal.classList.add('active');
-    },
+            modal.classList.add('active');
+        },
 
-    claimReward: () => {
-        const r = app.currentReward;
-        if (r.type === 'currency') SecureStore.addBalance(r.val);
-        if (r.type === 'extra_spin') STATE.games.roulette._es += r.val;
-        if (r.type === 'buff') STATE.games.starfall.buff = true;
-        if (r.type === 'item') STATE.cookies += r.val; // Assuming item is cookie
-        if (r.id === 'cup_hint') STATE.games.cups.hints = (STATE.games.cups.hints || 0) + 1;
+        claimReward: () => {
+            const r = app.currentReward;
+            if (r.type === 'currency') SecureStore.addBalance(r.val);
+            if (r.type === 'extra_spin') STATE.games.roulette._es += r.val;
+            if (r.type === 'buff') STATE.games.starfall.buff = true;
+            if (r.type === 'item') STATE.cookies += r.val; // Assuming item is cookie
+            if (r.id === 'cup_hint') STATE.games.cups.hints = (STATE.games.cups.hints || 0) + 1;
 
-        app.saveState();
-        app.closeRouletteModal();
-    },
-
-    sellReward: () => {
-        const r = app.currentReward;
-        if (r.sell > 0) {
-            SecureStore.addBalance(r.sell);
             app.saveState();
             app.closeRouletteModal();
+        },
+
+        sellReward: () => {
+            const r = app.currentReward;
+            if (r.sell > 0) {
+                SecureStore.addBalance(r.sell);
+                app.saveState();
+                app.closeRouletteModal();
+            }
+        },
+
+        preloadAssets: () => {
+            const assets = [
+                'zima.png', 'elka.png', 'kaka.png', 'star.png', 'perekrut.png',
+                'dedpobeda.png', 'dedlose.png', 'dedprivet.png',
+                'muz1.mp3', 'muz2.mp3', 'knopka.mp3'
+            ];
+            assets.forEach(src => {
+                const img = new Image();
+                img.src = src;
+            });
+        },
+
+        closeRouletteModal: () => {
+            document.getElementById('modal-roulette-reward').classList.remove('active');
+            window.location.hash = 'menu';
+        },
+
+        updateProfileUI: () => {
+            // Balance
+            const bal = SecureStore.getBalance();
+            const el = document.getElementById('profile-balance-display');
+            if (el) el.innerText = bal;
+
+            // Sound Toggle Sync
+            const toggle = document.getElementById('ui-sound-toggle');
+            const icon = document.getElementById('profile-sound-icon');
+
+            if (toggle && icon) {
+                if (soundManager.isMuted) {
+                    toggle.classList.remove('active');
+                    icon.src = 'zkk.png';
+                } else {
+                    toggle.classList.add('active');
+                    icon.src = 'zv.png';
+                }
+            }
+        },
+
+        updateNavIndicator: () => {
+            const nav = document.getElementById('bottom-nav');
+            const indicator = nav ? nav.querySelector('.nav-indicator') : null;
+            const activeItem = nav ? nav.querySelector('.nav-item.active') : null;
+
+            if (nav && indicator && activeItem) {
+                const targetLeft = activeItem.offsetLeft;
+                const targetWidth = activeItem.offsetWidth;
+
+                indicator.style.left = `${targetLeft}px`;
+                indicator.style.width = `${targetWidth}px`;
+
+                // Trigger squash animation
+                indicator.classList.remove('active-anim');
+                void indicator.offsetWidth;
+                indicator.classList.add('active-anim');
+            }
         }
-    },
+    };
 
-    preloadAssets: () => {
-        const assets = [
-            'zima.png', 'elka.png', 'kaka.png', 'star.png', 'perekrut.png',
-            'dedpobeda.png', 'dedlose.png', 'dedprivet.png',
-            'muz1.mp3', 'muz2.mp3', 'knopka.mp3'
-        ];
-        assets.forEach(src => {
-            const img = new Image();
-            img.src = src;
-        });
-    },
-
-    closeRouletteModal: () => {
-        document.getElementById('modal-roulette-reward').classList.remove('active');
-        window.location.hash = 'menu';
-    }
-};
-
-window.addEventListener('load', app.init);
-}) ();
+    document.addEventListener('DOMContentLoaded', () => {
+        app.init();
+        shopManager.init();
+    });
+})();

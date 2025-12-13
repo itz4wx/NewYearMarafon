@@ -174,27 +174,130 @@
 
 
             <!-- Shop (Placeholder) -->
-            <div class="game-card locked">
-                <div class="card-image grayscale">
-                    <img src="ava2.png" alt="Магазин" loading="lazy">
+            <!-- Shop -->
+
+        </div>
+
+
+        </div>
+
+    </section>
+
+    <!-- 2.1 Profile Section -->
+    <section id="screen-profile" class="screen">
+        <div class="content-center profile-wrapper">
+            <h2 class="page-title">Профиль</h2>
+
+            <div class="profile-user-info">
+                <div class="avatar-circle">
+                    <img src="sk1.png" alt="Avatar" class="profile-avatar-img">
                 </div>
-                <div class="card-info">
-                    <h3>Магазин</h3>
-                    <p>Скоро открытие...</p>
+                <h3 class="profile-username">Игрок</h3>
+            </div>
+
+            <div class="profile-balance-card">
+                <div class="pbc-header">
+                    <span class="pbc-label">Баланс Stars</span>
+                </div>
+                <div class="pbc-row">
+                    <div class="pbc-value">
+                        <img src="star.png" class="pbc-icon"> <span id="profile-balance-display">0</span>
+                    </div>
+                    <button class="btn-deposit">Пополнить</button>
+                </div>
+                <div class="pbc-wallet-icon">
+                    <!-- Icon placeholder -->
+                </div>
+            </div>
+
+            <div class="profile-menu">
+                <div class="profile-menu-item" id="btn-sound-profile-toggle">
+                    <div class="pmi-left">
+                        <img id="profile-sound-icon" src="zv.png" alt="Sound"
+                            style="width: 24px; height: 24px; object-fit: contain; margin-right: 10px;">
+                        <span>Звук</span>
+                    </div>
+                    <div class="toggle-switch" id="ui-sound-toggle">
+                        <div class="toggle-knob"></div>
+                    </div>
+                </div>
+                <div class="profile-menu-item">
+                    <div class="pmi-left">
+                        <span class="pmi-icon">👥</span>
+                        <span>Реферальная программа</span>
+                    </div>
+                    <span class="pmi-arrow">></span>
+                </div>
+                <div class="profile-menu-item">
+                    <div class="pmi-left">
+                        <span class="pmi-icon">💬</span>
+                        <span>Поддержка</span>
+                    </div>
+                    <span class="pmi-arrow">></span>
                 </div>
             </div>
         </div>
+    </section>
 
+    <!-- 2.2 Ranking Section -->
+    <!-- 2.2 Ranking Section -->
+    <section id="screen-ranking" class="screen">
+        <div class="content-center ranking-wrapper">
+            <h2 class="page-title">Рейтинг</h2>
+            <div class="season-timer-pill">9д: 04ч: 09м: 52с</div>
 
-        </div>
+            <div class="leaderboard-header">
+                <span>Place</span>
+                <span>Stars Volume</span>
+            </div>
 
-        <!-- Sound Controls (Menu Only) -->
-        <div class="sound-controls">
-            <button id="btn-sound-toggle" class="btn-sound">
-                <img id="sound-icon" src="zv.png" alt="Sound">
-            </button>
+            <div class="leaderboard-list" id="leaderboard-list">
+                <!-- JS will populate -->
+            </div>
+
+            <!-- Current User Sticky Rank -->
+            <div class="current-user-rank" id="current-user-rank-display">
+                <!-- JS will populate -->
+            </div>
         </div>
     </section>
+
+    <!-- 2.3 Shop Section -->
+    <!-- 2.3 Shop Section -->
+    <section id="screen-shop" class="screen">
+        <div class="content-center shop-wrapper">
+            <h2 class="page-title">Магазин</h2>
+
+            <div class="shop-coming-soon">
+                <div class="shop-icon-large">
+                    <img src="mag.png" alt="Shop">
+                </div>
+                <h3 class="neon-text-premium">Скоро откроется магазин!!!</h3>
+                <p>Мы готовим для вас что-то особенное!</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav" class="bottom-nav">
+        <div class="nav-indicator"></div>
+        <div class="nav-item" data-target="profile">
+            <div class="nav-icon"><img src="prof.png" alt="Профиль"></div>
+            <span>Профиль</span>
+        </div>
+        <div class="nav-item active" data-target="menu">
+            <div class="nav-icon"><img src="game.png" alt="Игры"></div>
+            <span>Игры</span>
+        </div>
+        <div class="nav-item" data-target="shop">
+            <div class="nav-icon"><img src="mag.png" alt="Магазин" style="border-radius: 50%;"></div>
+            <span>Магазин</span>
+        </div>
+        <div class="nav-item" data-target="ranking">
+            <div class="nav-icon"><img src="reyt.png" alt="Рейтинг"></div>
+            <span>Рейтинг</span>
+        </div>
+    </nav>
 
     <!-- Rules Modal -->
     <div id="modal-rules" class="modal-overlay">
